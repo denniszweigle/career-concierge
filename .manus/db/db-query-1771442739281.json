@@ -1,0 +1,17 @@
+{
+  "query": "SELECT userId, LEFT(accessToken, 20) as access_preview, LEFT(refreshToken, 20) as refresh_preview, expiresAt, createdAt FROM drive_tokens;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user D3p9BqToP95f5YB.29a26d66e130 --database cEDwcMHUnWyKwkKEYgb9qj --execute SELECT userId, LEFT(accessToken, 20) as access_preview, LEFT(refreshToken, 20) as refresh_preview, expiresAt, createdAt FROM drive_tokens;",
+  "rows": [
+    {
+      "userId": "1",
+      "access_preview": "ya29.a0ATkoCc4eATKCz",
+      "refresh_preview": "1//05bIs6mTMVuHOCgYI",
+      "expiresAt": "2026-02-18 08:36:27",
+      "createdAt": "2026-02-18 07:36:28"
+    }
+  ],
+  "messages": [],
+  "stdout": "userId\taccess_preview\trefresh_preview\texpiresAt\tcreatedAt\n1\tya29.a0ATkoCc4eATKCz\t1//05bIs6mTMVuHOCgYI\t2026-02-18 08:36:27\t2026-02-18 07:36:28\n",
+  "stderr": "",
+  "execution_time_ms": 136
+}
