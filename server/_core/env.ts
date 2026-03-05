@@ -12,7 +12,7 @@ export const ENV = {
   forgeApiKey: process.env.BUILT_IN_FORGE_API_KEY ?? "",
 
   // LLM tuning
-  llmModel: process.env.LLM_MODEL ?? "gemini-2.5-flash",
+  llmModel: process.env.LLM_MODEL ?? "gpt-4o-mini",
   llmMaxTokens: parseInt(process.env.LLM_MAX_TOKENS ?? "8192"),
   llmTemperature: parseFloat(process.env.LLM_TEMPERATURE ?? "0.1"),
   embeddingModel: process.env.EMBEDDING_MODEL ?? "text-embedding-3-small",
