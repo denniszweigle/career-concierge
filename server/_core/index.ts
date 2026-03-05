@@ -48,7 +48,7 @@ async function startServer() {
       router: appRouter,
       createContext,
       onError({ error, path }) {
-        console.error(`[tRPC error] ${path}:`, error.message);
+        console.error(`[tRPC error] ${path}:`, error.message, error.cause);
       },
     })
   );
