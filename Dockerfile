@@ -1,8 +1,8 @@
 # ---- Build stage ----
-FROM node:20-alpine AS builder
+FROM node:20-slim AS builder
 
-# Required to compile better-sqlite3 (native Node addon) on Alpine
-RUN apk add --no-cache python3 make g++
+# Required to compile better-sqlite3 native addon
+RUN apt-get update && apt-get install -y python3 make g++ && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
@@ -13,15 +13,12 @@ COPY package.json pnpm-lock.yaml ./
 COPY patches/ ./patches/
 RUN pnpm install --frozen-lockfile
 
-# Explicitly compile better-sqlite3 native addon
-RUN pnpm rebuild better-sqlite3
-
 # Copy source and build
 COPY . .
 RUN pnpm build
 
 # ---- Runtime stage ----
-FROM node:20-alpine AS runtime
+FROM node:20-slim AS runtime
 
 WORKDIR /app
 
