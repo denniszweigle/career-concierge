@@ -13,6 +13,9 @@ COPY package.json pnpm-lock.yaml ./
 COPY patches/ ./patches/
 RUN pnpm install --frozen-lockfile
 
+# Explicitly compile better-sqlite3 native addon
+RUN pnpm rebuild better-sqlite3
+
 # Copy source and build
 COPY . .
 RUN pnpm build
