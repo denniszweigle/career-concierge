@@ -1,183 +1,283 @@
 # Personal Career Concierge
 
-**Author:** dz zweigle
+**Author:** Dennis "DZ" Zweigle
 
-A RAG-based (Retrieval-Augmented Generation) web application that acts as an autonomous recruiter for Dennis "DZ" Zweigle's personal brand. The system connects to a Google Drive portfolio folder, indexes career documents (PDFs, DOCX, PPTX), and provides AI-powered job description matching with transparent Match vs. Mismatch reports.
+A RAG-based (Retrieval-Augmented Generation) web application that indexes career documents from Google Drive and uses vector similarity to match them against job descriptions, providing AI-powered match/mismatch analysis and conversational Q&A.
 
-## Overview
+---
 
-The Personal Career Concierge analyzes job descriptions against indexed portfolio documents to provide data-driven insights into candidate alignment. The system uses a weighted scoring algorithm across four pillars: Hard Skills (40%), Experience Depth (30%), Domain Context (20%), and Soft Skills/Culture (10%).
+## System Prerequisites
 
-## Key Features
+Install these before anything else:
 
-### Document Indexing & Processing
-- **Google Drive Integration**: OAuth 2.0 authentication to access shared portfolio folders
-- **Recursive Folder Scanning**: Automatically discovers and indexes PDF, DOCX, and PPTX files
-- **Text Extraction**: Extracts content from documents for semantic analysis
-- **Vector Embeddings**: Generates embeddings for efficient similarity search using LLM-based techniques
+| Tool | Version | Install |
+|---|---|---|
+| **Node.js** | 18+ | https://nodejs.org or `nvm install 20` |
+| **pnpm** | 10+ | `npm install -g pnpm` |
 
-### AI-Powered Matching
-- **Chain of Density Analysis**: Multi-pass requirement extraction that identifies both obvious and subtle job requirements
-- **RAG Architecture**: Retrieval-Augmented Generation for evidence-based matching
-- **Weighted Scoring**: Four-pillar scoring system with configurable weights
-- **Gap Detection**: Transparent identification of missing qualifications
-
-### Interactive Features
-- **Match/Mismatch Dashboard**: Visual representation of alignment scores and category breakdowns
-- **Conversational Q&A**: Ask questions about the candidate's background with answers grounded in actual documents
-- **Document Management**: Sync status, re-indexing controls, and document inventory
-
-## Technical Architecture
-
-### Backend Stack
-- **Framework**: Express 4 with tRPC 11 for type-safe API
-- **Database**: MySQL/TiDB with Drizzle ORM
-- **Authentication**: Manus OAuth for user management
-- **Document Processing**: mammoth (DOCX), pdf-lib (PDF), jszip (PPTX)
-- **AI Integration**: Built-in LLM service for embeddings and analysis
-
-### Frontend Stack
-- **Framework**: React 19 with TypeScript
-- **Styling**: Tailwind CSS 4 with shadcn/ui components
-- **Routing**: wouter for client-side navigation
-- **State Management**: tRPC React Query hooks
-- **UI Components**: Radix UI primitives with custom styling
-
-## Third-Party APIs
-
-### Google Drive API
-**Purpose**: Provides programmatic access to the portfolio folder containing career documents (resumes, articles, presentations).
-
-**Function**: The application uses the Google Drive API v3 to:
-- Authenticate users via OAuth 2.0
-- List files recursively within the specified shared folder
-- Download file contents for text extraction
-- Monitor file modifications for incremental sync
-
-**Why Needed**: The portfolio documents are stored in Google Drive, making the Drive API essential for accessing and indexing the source material. This approach allows the portfolio owner to manage documents in a familiar environment while the application automatically stays synchronized.
-
-**Implementation**: Located in `server/googleDrive.ts`, using the `googleapis` npm package (v171.4.0).
-
-### Manus Built-in LLM Service
-**Purpose**: Provides large language model capabilities for text analysis, embedding generation, and conversational AI.
-
-**Function**: The application uses the LLM service to:
-- Generate vector embeddings for document chunks
-- Extract job requirements using Chain of Density prompting
-- Calculate semantic similarity between requirements and portfolio evidence
-- Generate detailed match/mismatch reports
-- Answer questions about the candidate's background
-
-**Why Needed**: The core RAG functionality depends on semantic understanding of both job descriptions and portfolio documents. The LLM service enables intelligent matching beyond simple keyword search, identifying implicit requirements and providing natural language explanations.
-
-**Implementation**: Located in `server/_core/llm.ts`, accessed via the `invokeLLM` helper function with automatic credential injection.
-
-## Database Schema
-
-### Core Tables
-- **users**: Authentication and user management
-- **driveTokens**: OAuth tokens for Google Drive access
-- **documents**: Indexed portfolio files with metadata
-- **documentChunks**: Text segments with vector embeddings
-- **analyses**: Job description analysis sessions
-- **chatMessages**: Conversational Q&A history
-
-## Setup Instructions
-
-### Prerequisites
-1. Google Cloud Console project with Drive API enabled
-2. OAuth 2.0 credentials (Client ID and Secret)
-3. Manus account with project access
-
-### Configuration
-1. Set Google Drive OAuth credentials via the application UI or environment variables:
-   - `GOOGLE_DRIVE_CLIENT_ID`
-   - `GOOGLE_DRIVE_CLIENT_SECRET`
-
-2. Update the portfolio folder URL in `server/routers.ts`:
-   ```typescript
-   const PORTFOLIO_FOLDER_URL = "https://drive.google.com/drive/folders/YOUR_FOLDER_ID";
-   ```
-
-### Running the Application
+Verify:
 ```bash
-# Install dependencies
-pnpm install
-
-# Push database schema
-pnpm db:push
-
-# Start development server
-pnpm dev
-
-# Run tests
-pnpm test
+node --version   # v18.x or higher
+pnpm --version   # 10.x or higher
 ```
 
-## Usage Workflow
+---
 
-### 1. Connect Google Drive
-Navigate to the Dashboard and click "Connect Google Drive". Complete the OAuth flow to authorize access to the portfolio folder.
+## Stack
 
-### 2. Sync Documents
-Click "Sync Documents" to scan the folder, extract text from files, and generate vector embeddings. This process may take several minutes depending on the number and size of documents.
+| Layer | Technology |
+|---|---|
+| **Frontend** | React 19, TypeScript, Tailwind CSS 4, shadcn/ui (Radix), wouter, tRPC React Query |
+| **Backend** | Express 4, tRPC 11, Drizzle ORM |
+| **Database** | SQLite via `better-sqlite3` |
+| **LLM** | OpenAI-compatible endpoint via LangChain (`gpt-4o-mini` default, `text-embedding-3-small` for embeddings) |
+| **Auth** | JWT session cookie (`app_session_id`) signed with `JWT_SECRET` |
+| **Document parsing** | `pdf-parse` (PDF), `mammoth` (DOCX), `jszip` (PPTX), `xlsx` (XLSX), plain text |
 
-### 3. Analyze Job Description
-Paste a job description into the analysis form. Optionally provide a job title for better context. Click "Analyze Match" to initiate the matching process.
+---
 
-### 4. Review Results
-The analysis page displays:
-- Overall Match and Mismatch scores
-- Category-level scores (Hard Skills, Experience, Domain, Soft Skills)
-- Top 3 alignment strengths with evidence
-- Top 3 critical gaps
-- Detailed narrative report
+## Quick Start
 
-### 5. Ask Questions
-Use the conversational Q&A interface to explore specific aspects of the candidate's background. Questions are answered using relevant chunks from the indexed documents.
+### 1. Install dependencies
+
+```bash
+pnpm install
+```
+
+### 2. Create `.env`
+
+Copy the template below and fill in values (see [Environment Variables](#environment-variables) for details):
+
+```env
+# Database
+DATABASE_URL=file:./data/db.sqlite
+
+# Auth (required)
+JWT_SECRET=<generate: node -e "console.log(require('crypto').randomBytes(32).toString('hex'))">
+OWNER_OPEN_ID=local-dev-user
+VITE_APP_ID=career-concierge-dev
+OAUTH_SERVER_URL=                      # Leave blank for localhost dev
+
+# LLM (OpenAI-compatible endpoint)
+BUILT_IN_FORGE_API_URL=https://api.openai.com
+BUILT_IN_FORGE_API_KEY=sk-...
+
+# Google Drive
+GOOGLE_DRIVE_CLIENT_ID=<your-client-id>.apps.googleusercontent.com
+GOOGLE_DRIVE_CLIENT_SECRET=<your-client-secret>
+GOOGLE_DRIVE_FOLDER_URL=https://drive.google.com/drive/folders/<folder-id>
+```
+
+### 3. Initialize the database
+
+```bash
+pnpm db:push
+```
+
+### 4. Start the dev server
+
+```bash
+pnpm dev
+```
+
+App runs at `http://localhost:3000`.
+
+### 5. Log in (localhost only)
+
+Visit `http://localhost:3000/api/dev-login` — this creates/upserts an admin user from `OWNER_OPEN_ID`, sets a session cookie, and redirects to `/admin`. No Manus OAuth required.
+
+Alternatively, the Admin page shows a **Dev Login** button automatically when running in dev mode.
+
+---
+
+## Commands
+
+```bash
+pnpm dev          # Start dev server (tsx watch + Vite HMR)
+pnpm build        # Build frontend (Vite) + backend (esbuild ESM bundle)
+pnpm start        # Run production build from dist/index.js
+pnpm check        # TypeScript type checking (no emit)
+pnpm format       # Prettier formatting
+pnpm test         # Run all Vitest tests (server only)
+pnpm db:push      # Apply Drizzle schema to SQLite (run after schema changes)
+```
+
+Run a single test file:
+```bash
+pnpm test server/openai.integration.test.ts
+```
+
+Integration tests (`*.integration.test.ts`) make real API calls and require valid env vars.
+
+---
+
+## Environment Variables
+
+### Required
+
+```env
+DATABASE_URL              # SQLite path, e.g. file:./data/db.sqlite
+JWT_SECRET                # Signs session JWTs — any random 32+ char string for dev
+BUILT_IN_FORGE_API_URL    # OpenAI-compatible base URL, e.g. https://api.openai.com (no /v1 suffix — code appends it)
+BUILT_IN_FORGE_API_KEY    # OpenAI API key
+
+GOOGLE_DRIVE_CLIENT_ID
+GOOGLE_DRIVE_CLIENT_SECRET
+GOOGLE_DRIVE_FOLDER_URL   # Full Google Drive folder URL
+
+OWNER_OPEN_ID             # The openId string that gets role=admin in the DB
+VITE_APP_ID               # Embedded in JWT payload — any string works for dev
+```
+
+### Optional / Localhost Unused
+
+```env
+OAUTH_SERVER_URL          # Manus OAuth server — leave blank for localhost dev
+```
+
+### LangSmith Observability (optional)
+
+```env
+LANGCHAIN_TRACING_V2=true
+LANGCHAIN_API_KEY=<your-langsmith-key>
+LANGCHAIN_PROJECT=<project-name>
+```
+
+### LLM Tuning (all have defaults)
+
+```env
+LLM_MODEL                 # default: gpt-4o-mini
+LLM_MAX_TOKENS            # default: 8192
+LLM_TEMPERATURE           # default: 0.1
+EMBEDDING_MODEL           # default: text-embedding-3-small
+CHUNK_SIZE                # default: 1000 (chars)
+CHUNK_OVERLAP             # default: 200 (chars)
+RAG_TOP_K_EVIDENCE        # default: 3
+RAG_TOP_K_QA              # default: 5
+RAG_STRENGTH_THRESHOLD    # default: 60 (0–100 score cutoff for strength vs gap)
+```
+
+---
+
+## Google Drive Setup
+
+See [`docs/google_drive_setup.md`](docs/google_drive_setup.md) for the full walkthrough. Summary:
+
+1. Create a Google Cloud project and enable the **Google Drive API**.
+2. Create an OAuth 2.0 Web Application credential.
+3. Add `http://localhost:3000/api/google-drive/callback` as an authorized redirect URI.
+4. Copy the Client ID and Secret into `.env`.
+5. In the app, go to Admin → Connect Google Drive → complete the OAuth flow.
+6. Click **Sync Documents** to index your folder.
+
+Supported file types: PDF, DOCX, PPTX, XLSX, TXT. All other types (images, video, Visio, etc.) are skipped.
+
+---
+
+## Auth & Roles
+
+- `OWNER_OPEN_ID` — the `openId` that gets `role = 'admin'` on upsert
+- `adminProcedure` — required for Drive operations and analysis listing
+- `protectedProcedure` — any authenticated user
+- `publicProcedure` — no auth (used by `auth.me`, `analysis.create`, `analysis.get`)
+
+For full localhost auth setup details see [`docs/oauth_setup_instructions.md`](docs/oauth_setup_instructions.md).
+
+---
+
+## Architecture
+
+### Key Data Flow
+
+**Document Indexing** (`drive.syncDocuments` tRPC procedure):
+1. Lists files recursively from the configured Google Drive folder
+2. Filters to extractable MIME types (PDF/DOCX/PPTX/XLSX/TXT)
+3. Extracts text from each file
+4. Chunks text and stores in `documents` + `documentChunks` SQLite tables
+5. Generates embeddings and stores as JSON arrays in SQLite
+
+**Job Matching** (`analysis.create` tRPC procedure):
+1. Extracts 4 requirement categories from the JD (hardSkills, experience, domain, softSkills)
+2. Embeds each category and compares against all document chunks via in-memory cosine similarity
+3. Weighted score: `matchScore = hardSkills×0.4 + experience×0.3 + domain×0.2 + softSkills×0.1`
+4. LLM generates a narrative report with top strengths and gaps
+
+### Directory Structure
+
+```
+client/src/
+  pages/         # Admin.tsx, Analysis.tsx, Home.tsx
+  components/    # shadcn/ui + custom components
+  hooks/         # Custom React hooks
+server/
+  _core/         # index.ts (Express entry), trpc.ts, context.ts, llm.ts, env.ts, cookies.ts
+  routers.ts     # All tRPC routers (auth, drive, analysis)
+  db.ts          # All Drizzle CRUD — single source of truth for DB access
+  devLogin.ts    # GET /api/dev-login — localhost-only session bootstrap
+  matchingEngine.ts    # Job matching, Chain of Density extraction, Q&A
+  vectorEmbedding.ts   # Embedding generation + in-memory cosine similarity search
+  documentExtractor.ts # PDF/DOCX/PPTX/XLSX/TXT extraction + chunking
+  googleDrive.ts       # Google Drive API wrapper
+  googleDriveCallback.ts  # Express route for /api/google-drive/callback
+drizzle/
+  schema.ts      # DB schema: users, driveTokens, documents, documentChunks, analyses, chatMessages
+docs/
+  oauth_setup_instructions.md  # Localhost dev session setup
+  google_drive_setup.md        # Google Cloud project + Drive OAuth setup
+```
+
+### tRPC API Shape
+
+- `auth.me` / `auth.logout` — public
+- `drive.getAuthUrl` / `.handleCallback` / `.getConnectionStatus` / `.disconnect` / `.syncDocuments` / `.getDocuments` — admin only
+- `analysis.create` / `.get` / `.askQuestion` / `.getChatHistory` — public
+- `analysis.list` — admin only
+
+### Path Aliases
+
+- `@/` → `client/src/`
+- `@shared/` → `shared/`
+
+---
 
 ## Scoring Algorithm
 
-The matching algorithm uses a weighted scoring system:
-
 ```
 Match Score = (Hard Skills × 0.4) + (Experience × 0.3) + (Domain × 0.2) + (Soft Skills × 0.1)
-Mismatch Score = 100 - Match Score
 ```
 
-Each category score is calculated by:
-1. Extracting requirements using Chain of Density prompting
-2. Generating embeddings for each requirement
-3. Finding top matching document chunks via cosine similarity
-4. Averaging similarity scores across all requirements in the category
+Each category score is the average cosine similarity between the embedded requirement and the top matching document chunks.
 
-## Chain of Density Protocol
+---
 
-The system uses a multi-pass analysis technique to ensure comprehensive requirement extraction:
+## Known Limitations
 
-1. **First Pass**: Extract obvious requirements
-2. **Second Pass**: Find implicit requirements and preferences
-3. **Third Pass**: Identify subtle requirements easily missed
-4. **Fourth Pass**: Detect requirements hidden in culture or role descriptions
+- **Vector search** is an in-memory linear scan over all chunks — not suitable for large document sets (consider Pinecone/Weaviate for scale)
+- **Document sync** runs synchronously in the request — no background job queue
+- **pdf-parse** uses CJS interop via `createRequire` — must stay that way; ESM import will fail
 
-This approach prevents the system from acting as a "hype bot" and ensures honest, professional assessments.
+---
 
-## Development Notes
+## Tests
 
-### Document Extraction Limitations
-The current PDF extraction implementation uses `pdf-lib`, which does not include built-in text extraction. For production use, consider integrating `pdf.js` or a similar library with OCR capabilities.
+```
+server/openai.integration.test.ts       # Verifies LLM + embedding connectivity
+server/googledrive.integration.test.ts  # Verifies Drive OAuth setup
+server/documentExtractor.test.ts        # 8 tests covering all 5 file types
+```
 
-### Vector Embedding Approach
-The application uses a simplified embedding technique for demonstration. Production deployments should integrate dedicated embedding models (e.g., OpenAI's text-embedding-ada-002) for improved semantic accuracy.
+---
 
-### Scalability Considerations
-- Document sync is currently synchronous; consider implementing background job processing for large portfolios
-- Vector similarity search is performed in-memory; consider integrating a vector database (Pinecone, Weaviate) for production scale
+## Production Deployment
+
+Deployed on a Hetzner VPS using Docker Compose with Caddy as a reverse proxy for automatic HTTPS.
+
+See [`docs/hetzner_deployment.md`](docs/hetzner_deployment.md) for the full step-by-step guide.
+
+CI/CD is handled by GitHub Actions (`.github/workflows/deploy.yml`): every push to `main` runs type-check and unit tests, then SSHes into the Hetzner server to pull and rebuild automatically.
+
+---
 
 ## License
 
 MIT
-
-## Contact
-
-For questions or support, contact dz zweigle.

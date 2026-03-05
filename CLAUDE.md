@@ -13,6 +13,10 @@ pnpm format       # Prettier formatting
 pnpm test         # Run all Vitest tests (server only, Node environment)
 pnpm test server/openai.integration.test.ts   # Run a single test file
 pnpm db:push      # Apply Drizzle schema to SQLite (run after schema changes)
+
+# CI/CD: push to main triggers GitHub Actions → type-check → unit tests → SSH redeploy
+# Requires GitHub secrets: HETZNER_HOST, HETZNER_SSH_KEY
+# Manual deploy: see docs/hetzner_deployment.md
 ```
 
 Tests live in `server/**/*.test.ts` and `server/**/*.spec.ts`. There is no frontend test setup.
