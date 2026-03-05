@@ -1,0 +1,6 @@
+# Replace yourdomain.com with your actual domain before deploying.
+# Caddy automatically obtains and renews a Let's Encrypt TLS certificate.
+
+yourdomain.com {
+    reverse_proxy app:3000
+}
