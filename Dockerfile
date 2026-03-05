@@ -20,17 +20,11 @@ RUN pnpm build
 # ---- Runtime stage ----
 FROM node:20-alpine AS runtime
 
-# Required to compile better-sqlite3 in the runtime install
-RUN apk add --no-cache python3 make g++
-
 WORKDIR /app
 
-RUN npm install -g pnpm@10
-
-# Install production dependencies only
-COPY package.json pnpm-lock.yaml ./
-COPY patches/ ./patches/
-RUN pnpm install --frozen-lockfile --prod
+# Copy node_modules from builder (already compiled with native addons)
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/package.json ./package.json
 
 # Copy built frontend + backend from builder
 COPY --from=builder /app/dist ./dist
