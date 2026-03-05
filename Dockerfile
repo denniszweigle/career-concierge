@@ -35,6 +35,10 @@ RUN pnpm install --frozen-lockfile --prod
 # Copy built frontend + backend from builder
 COPY --from=builder /app/dist ./dist
 
+# Copy drizzle config + schema for migrations
+COPY --from=builder /app/drizzle.config.ts ./drizzle.config.ts
+COPY --from=builder /app/drizzle ./drizzle
+
 EXPOSE 3000
 ENV NODE_ENV=production
 
