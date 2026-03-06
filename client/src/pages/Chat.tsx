@@ -6,7 +6,13 @@ import { toast } from "sonner";
 import { Streamdown } from "streamdown";
 
 type Source = { documentId: number; fileName: string; driveFileId: string; fileType: string; similarity: number };
-type Message = { role: "user" | "assistant"; content: string; sources?: Source[] };
+type Message = { role: "user" | "assistant"; content: string; sources?: Source[]; tokens?: { input: number; output: number } };
+
+const CHAT_ADJECTIVES = ["Thinking", "Searching", "Reasoning", "Analyzing", "Synthesizing", "Processing"];
+
+function formatElapsed(s: number) {
+  return s < 60 ? `${s}s` : `${Math.floor(s / 60)}m ${s % 60}s`;
+}
 
 const SUGGESTED_PROMPTS = [
   "What are Dennis's strongest technical skills?",
@@ -26,12 +32,32 @@ export default function Chat() {
   const [question, setQuestion] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
   const [streamingText, setStreamingText] = useState("");
+  const [adjIdx, setAdjIdx] = useState(0);
+  const [elapsed, setElapsed] = useState(0);
+  const startTimeRef = useRef<number | null>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [history, isStreaming, streamingText]);
+
+  useEffect(() => {
+    if (!isStreaming) return;
+    setAdjIdx(0);
+    const id = setInterval(() => setAdjIdx(i => (i + 1) % CHAT_ADJECTIVES.length), 1800);
+    return () => clearInterval(id);
+  }, [isStreaming]);
+
+  useEffect(() => {
+    if (!isStreaming) { setElapsed(0); return; }
+    startTimeRef.current = Date.now();
+    setElapsed(0);
+    const id = setInterval(() => {
+      setElapsed(Math.floor((Date.now() - startTimeRef.current!) / 1000));
+    }, 500);
+    return () => clearInterval(id);
+  }, [isStreaming]);
 
   const handleAsk = async (q?: string) => {
     const text = (q ?? question).trim();
@@ -80,7 +106,10 @@ export default function Chat() {
               accumulated += data.text;
               setStreamingText(accumulated);
             } else if (data.done) {
-              setHistory(prev => [...prev, { role: "assistant", content: accumulated, sources: data.sources ?? [] }]);
+              const tokens = (data.tokensInput || data.tokensOutput)
+                ? { input: data.tokensInput ?? 0, output: data.tokensOutput ?? 0 }
+                : undefined;
+              setHistory(prev => [...prev, { role: "assistant", content: accumulated, sources: data.sources ?? [], tokens }]);
               setStreamingText("");
               setIsStreaming(false);
             } else if (data.error) {
@@ -180,6 +209,12 @@ export default function Chat() {
                   )}
                 </div>
 
+                {msg.role === "assistant" && msg.tokens && (
+                  <p className="text-xs text-muted-foreground/60 mt-1 px-1">
+                    {msg.tokens.input.toLocaleString()} in · {msg.tokens.output.toLocaleString()} out
+                  </p>
+                )}
+
                 {msg.role === "assistant" && msg.sources && msg.sources.length > 0 && (
                   <div className="mt-2 max-w-[75%] space-y-1">
                     <p className="text-xs text-muted-foreground px-1">Sources</p>
@@ -211,13 +246,16 @@ export default function Chat() {
                     <Streamdown>{streamingText}</Streamdown>
                   </div>
                 </div>
+                <p className="text-xs text-muted-foreground/60 mt-1 px-1">{formatElapsed(elapsed)}</p>
               </div>
             )}
 
             {isStreaming && !streamingText && (
               <div className="flex justify-start">
-                <div className="bg-card border rounded-2xl rounded-bl-sm px-4 py-3 shadow-sm">
-                  <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                <div className="bg-card border rounded-2xl rounded-bl-sm px-4 py-3 shadow-sm flex items-center gap-2.5">
+                  <Loader2 className="h-4 w-4 animate-spin text-muted-foreground flex-shrink-0" />
+                  <span className="text-sm font-semibold text-red-500">{CHAT_ADJECTIVES[adjIdx]}</span>
+                  <span className="text-xs text-muted-foreground">· {formatElapsed(elapsed)}</span>
                 </div>
               </div>
             )}

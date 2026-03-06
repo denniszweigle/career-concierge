@@ -8,8 +8,8 @@ import { registerGoogleDriveCallback } from "../googleDriveCallback";
 import { registerDevLogin } from "../devLogin";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
-import { streamAnswer } from "../matchingEngine";
-import { saveChatMessage, getChatMessages } from "../db";
+import { streamAnswer, streamMatchJobDescription } from "../matchingEngine";
+import { saveChatMessage, getChatMessages, saveAnalysis } from "../db";
 import { serveStatic, setupVite } from "./vite";
 
 function isPortAvailable(port: number): Promise<boolean> {
@@ -43,6 +43,53 @@ async function startServer() {
   registerOAuthRoutes(app);
   // Google Drive OAuth callback
   registerGoogleDriveCallback(app);
+  // Streaming match analysis — SSE endpoint, emits progress then saves & redirects
+  app.post("/api/stream-match", async (req, res) => {
+    const { jobTitle, jobDescription } = req.body as {
+      jobTitle?: string;
+      jobDescription: string;
+    };
+
+    if (!jobDescription || typeof jobDescription !== "string") {
+      res.status(400).json({ error: "jobDescription required" });
+      return;
+    }
+
+    res.setHeader("Content-Type", "text/event-stream");
+    res.setHeader("Cache-Control", "no-cache");
+    res.setHeader("Connection", "keep-alive");
+
+    try {
+      for await (const event of streamMatchJobDescription(jobDescription, jobTitle)) {
+        if (event.type === "status") {
+          res.write(`data: ${JSON.stringify(event)}\n\n`);
+        } else {
+          const analysisId = await saveAnalysis({
+            userId: null,
+            jobTitle: jobTitle || null,
+            jobDescription,
+            matchScore: event.data.matchScore,
+            mismatchScore: event.data.mismatchScore,
+            hardSkillsScore: event.data.hardSkillsScore,
+            experienceScore: event.data.experienceScore,
+            domainScore: event.data.domainScore,
+            softSkillsScore: event.data.softSkillsScore,
+            topStrengths: event.data.topStrengths,
+            topGaps: event.data.topGaps,
+            detailedReport: event.data.detailedReport,
+            tokensInput: event.data.tokensInput,
+            tokensOutput: event.data.tokensOutput,
+          });
+          res.write(`data: ${JSON.stringify({ type: "done", analysisId, tokensInput: event.data.tokensInput, tokensOutput: event.data.tokensOutput })}\n\n`);
+        }
+      }
+    } catch (err) {
+      console.error("[stream-match] Error:", err);
+      res.write(`data: ${JSON.stringify({ type: "error", message: "Analysis failed" })}\n\n`);
+    }
+    res.end();
+  });
+
   // Streaming Q&A — SSE endpoint, bypasses tRPC for progressive rendering
   app.post("/api/stream-answer", async (req, res) => {
     const { question, history, analysisId } = req.body as {
@@ -92,7 +139,7 @@ async function startServer() {
               tokensOutput: event.tokensOutput,
             });
           }
-          res.write(`data: ${JSON.stringify({ done: true, sources: event.sources })}\n\n`);
+          res.write(`data: ${JSON.stringify({ done: true, sources: event.sources, tokensInput: event.tokensInput, tokensOutput: event.tokensOutput })}\n\n`);
         }
       }
     } catch (err) {

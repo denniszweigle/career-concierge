@@ -522,6 +522,76 @@ export async function answerQuestion(
 }
 
 // ---------------------------------------------------------------------------
+// Streaming match pipeline — same as matchJobDescription but emits progress
+// ---------------------------------------------------------------------------
+export type StreamMatchEvent =
+  | { type: "status"; stage: string; step: number; totalSteps: number }
+  | { type: "result"; data: Awaited<ReturnType<typeof matchJobDescription>> };
+
+export async function* streamMatchJobDescription(
+  jobDescription: string,
+  jobTitle?: string
+): AsyncGenerator<StreamMatchEvent> {
+  yield { type: "status", stage: "Extracting requirements", step: 1, totalSteps: 4 };
+  const requirements = await extractJobRequirements(jobDescription);
+
+  const allRequirements = [
+    ...requirements.hardSkills,
+    ...requirements.experienceRequirements,
+    ...requirements.domainKnowledge,
+    ...requirements.softSkills,
+  ];
+
+  yield { type: "status", stage: "Searching portfolio", step: 2, totalSteps: 4 };
+  const allEvidence = await findEvidenceForRequirements(allRequirements);
+
+  yield { type: "status", stage: "Scoring evidence", step: 3, totalSteps: 4 };
+  const hardSkillsEvidence = allEvidence.slice(0, requirements.hardSkills.length);
+  const experienceEvidence = allEvidence.slice(
+    requirements.hardSkills.length,
+    requirements.hardSkills.length + requirements.experienceRequirements.length
+  );
+  const domainEvidence = allEvidence.slice(
+    requirements.hardSkills.length + requirements.experienceRequirements.length,
+    requirements.hardSkills.length + requirements.experienceRequirements.length + requirements.domainKnowledge.length
+  );
+  const softSkillsEvidence = allEvidence.slice(
+    requirements.hardSkills.length + requirements.experienceRequirements.length + requirements.domainKnowledge.length
+  );
+
+  const hardSkillsScore = calculateCategoryScore(hardSkillsEvidence);
+  const experienceScore = calculateCategoryScore(experienceEvidence);
+  const domainScore = calculateCategoryScore(domainEvidence);
+  const softSkillsScore = calculateCategoryScore(softSkillsEvidence);
+  const matchScore =
+    hardSkillsScore * 0.4 + experienceScore * 0.3 + domainScore * 0.2 + softSkillsScore * 0.1;
+
+  yield { type: "status", stage: "Generating report", step: 4, totalSteps: 4 };
+  const analysis = await generateDetailedAnalysis(
+    jobTitle,
+    { hardSkills: hardSkillsEvidence, experience: experienceEvidence, domain: domainEvidence, softSkills: softSkillsEvidence },
+    { matchScore, hardSkillsScore, experienceScore, domainScore, softSkillsScore }
+  );
+
+  yield {
+    type: "result",
+    data: {
+      matchScore: Math.round(matchScore * 10) / 10,
+      mismatchScore: Math.round((100 - matchScore) * 10) / 10,
+      hardSkillsScore: Math.round(hardSkillsScore * 10) / 10,
+      experienceScore: Math.round(experienceScore * 10) / 10,
+      domainScore: Math.round(domainScore * 10) / 10,
+      softSkillsScore: Math.round(softSkillsScore * 10) / 10,
+      topStrengths: analysis.topStrengths,
+      topGaps: analysis.topGaps,
+      detailedReport: analysis.report,
+      tokensInput: analysis.tokensInput,
+      tokensOutput: analysis.tokensOutput,
+    },
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Streaming Q&A — same retrieval pipeline, streams the final LLM response
 // ---------------------------------------------------------------------------
 export async function* streamAnswer(

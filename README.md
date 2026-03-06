@@ -27,7 +27,7 @@ pnpm --version   # 10.x or higher
 
 | Layer | Technology |
 |---|---|
-| **Frontend** | React 19, TypeScript, Tailwind CSS 4, shadcn/ui (Radix), wouter, tRPC React Query |
+| **Frontend** | React 19, TypeScript, Tailwind CSS 4, shadcn/ui (Radix), wouter, tRPC React Query, dark mode (cookie-persisted) |
 | **Backend** | Express 4, tRPC 11, Drizzle ORM |
 | **Database** | SQLite via `better-sqlite3` |
 | **LLM** | OpenAI-compatible endpoint via LangChain (`gpt-4o-mini` default, `text-embedding-3-small` for embeddings) |
@@ -152,9 +152,9 @@ LLM_TEMPERATURE           # default: 0.1
 EMBEDDING_MODEL           # default: text-embedding-3-small
 CHUNK_SIZE                # default: 1000 (chars)
 CHUNK_OVERLAP             # default: 200 (chars)
-RAG_TOP_K_EVIDENCE        # default: 3
-RAG_TOP_K_QA              # default: 5
-RAG_STRENGTH_THRESHOLD    # default: 60 (0–100 score cutoff for strength vs gap)
+RAG_TOP_K_STAGE1          # default: 50 (Stage 1 cosine scan candidate pool)
+RAG_TOP_K_EVIDENCE        # default: 8 (Stage 2 re-ranker final passage count)
+RAG_STRENGTH_THRESHOLD    # default: 50 (0–100 score cutoff for strength vs gap)
 ```
 
 ---
@@ -191,22 +191,31 @@ For full localhost auth setup details see [`docs/oauth_setup_instructions.md`](d
 
 **Document Indexing** (`drive.syncDocuments` tRPC procedure):
 1. Lists files recursively from the configured Google Drive folder
-2. Filters to extractable MIME types (PDF/DOCX/PPTX/XLSX/TXT)
-3. Extracts text from each file
-4. Chunks text and stores in `documents` + `documentChunks` SQLite tables
-5. Generates embeddings and stores as JSON arrays in SQLite
+2. Filters to extractable MIME types (PDF/DOCX/PPTX/XLSX/TXT); skips unchanged files via `modifiedTime` comparison
+3. Deletes stale chunks before re-indexing changed files (no chunk duplication on repeat syncs)
+4. Extracts text from each file
+5. Chunks text and stores in `documents` + `documentChunks` SQLite tables
+6. Generates embeddings and stores as JSON arrays in SQLite; clears in-memory chunk cache after sync
 
-**Job Matching** (`analysis.create` tRPC procedure):
-1. Extracts 4 requirement categories from the JD (hardSkills, experience, domain, softSkills)
-2. Embeds each category and compares against all document chunks via in-memory cosine similarity
-3. Weighted score: `matchScore = hardSkills×0.4 + experience×0.3 + domain×0.2 + softSkills×0.1`
-4. LLM generates a narrative report with top strengths and gaps
+**Job Matching** (`POST /api/stream-match` SSE endpoint):
+1. Chain of Density extraction — four-pass LLM call extracts hard skills, experience, domain, and soft skill requirements from the JD
+2. Stage 1 — cosine similarity scan across all chunks (loaded from in-memory cache after first request); top `RAG_TOP_K_STAGE1` (default 50) candidates selected per requirement
+3. LLM re-ranker narrows to `RAG_TOP_K_EVIDENCE` (default 8) using language-level precision
+4. Weighted score: `matchScore = hardSkills×0.4 + experience×0.3 + domain×0.2 + softSkills×0.1`
+5. LLM generates a narrative report with top strengths and gaps, grounded in the top 3 retrieved evidence passages per requirement
+6. Progress streamed as SSE events (`Extracting requirements` → `Searching portfolio` → `Scoring evidence` → `Generating report`) — client shows live stage name, cycling adjective, progress bar, and elapsed time
+
+**Portfolio Q&A** (`POST /api/stream-answer` SSE endpoint):
+1. HyDE — generates a hypothetical passage, embeds it for Stage 1 search
+2. Stage 1 — cosine scan against in-memory chunk cache; list queries ("list all patents", "how many...") automatically use `topK×4` and `stage1Pool×3`
+3. Stage 2 — LLM re-ranker selects final passages
+4. SSE streaming — answer streams token-by-token; client shows cycling adjective + elapsed time during retrieval, then renders text progressively; token usage (`in · out`) shown after completion
 
 ### Directory Structure
 
 ```
 client/src/
-  pages/         # Admin.tsx, Analysis.tsx, Home.tsx
+  pages/         # Admin.tsx, Analysis.tsx, Chat.tsx, Home.tsx, Reports.tsx, Tech.tsx
   components/    # shadcn/ui + custom components
   hooks/         # Custom React hooks
 server/
@@ -219,6 +228,7 @@ server/
   documentExtractor.ts # PDF/DOCX/PPTX/XLSX/TXT extraction + chunking
   googleDrive.ts       # Google Drive API wrapper
   googleDriveCallback.ts  # Express route for /api/google-drive/callback
+  syncState.ts         # In-memory chunk cache + incremental sync state
 drizzle/
   schema.ts      # DB schema: users, driveTokens, documents, documentChunks, analyses, chatMessages
 docs/
@@ -230,8 +240,11 @@ docs/
 
 - `auth.me` / `auth.logout` — public
 - `drive.getAuthUrl` / `.handleCallback` / `.getConnectionStatus` / `.disconnect` / `.syncDocuments` / `.getDocuments` — admin only
-- `analysis.create` / `.get` / `.askQuestion` / `.getChatHistory` — public
+- `analysis.create` / `.get` / `.askQuestion` / `.getChatHistory` / `.chatGeneral` — public
 - `analysis.list` — admin only
+- `stats.getPublicStats` — public
+- `POST /api/stream-match` — SSE endpoint; streams job match pipeline progress + final result
+- `POST /api/stream-answer` — SSE endpoint; streams Q&A answers token-by-token with token usage in done event
 
 ### Path Aliases
 
@@ -252,8 +265,8 @@ Each category score is the average cosine similarity between the embedded requir
 
 ## Known Limitations
 
-- **Vector search** is an in-memory linear scan over all chunks — not suitable for large document sets (consider Pinecone/Weaviate for scale)
-- **Document sync** runs synchronously in the request — no background job queue
+- **Vector search** uses an in-memory chunk cache with linear cosine scan — fast for personal document sets, not suitable for large corpora
+- **Document sync** runs synchronously in the request — no background job queue; incremental sync skips unchanged files to reduce latency
 - **pdf-parse** uses CJS interop via `createRequire` — must stay that way; ESM import will fail
 
 ---
