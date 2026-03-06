@@ -58,11 +58,19 @@ async function startServer() {
     res.setHeader("Content-Type", "text/event-stream");
     res.setHeader("Cache-Control", "no-cache");
     res.setHeader("Connection", "keep-alive");
+    res.setHeader("X-Accel-Buffering", "no");
+
+    const matchSse = (payload: object) => {
+      if (!res.writableEnded) {
+        res.write(`data: ${JSON.stringify(payload)}\n\n`);
+        (res as any).flush?.();
+      }
+    };
 
     try {
       for await (const event of streamMatchJobDescription(jobDescription, jobTitle)) {
         if (event.type === "status") {
-          res.write(`data: ${JSON.stringify(event)}\n\n`);
+          matchSse(event);
         } else {
           const analysisId = await saveAnalysis({
             userId: null,
@@ -80,14 +88,14 @@ async function startServer() {
             tokensInput: event.data.tokensInput,
             tokensOutput: event.data.tokensOutput,
           });
-          res.write(`data: ${JSON.stringify({ type: "done", analysisId, tokensInput: event.data.tokensInput, tokensOutput: event.data.tokensOutput })}\n\n`);
+          matchSse({ type: "done", analysisId, tokensInput: event.data.tokensInput, tokensOutput: event.data.tokensOutput });
         }
       }
     } catch (err) {
       console.error("[stream-match] Error:", err);
-      res.write(`data: ${JSON.stringify({ type: "error", message: "Analysis failed" })}\n\n`);
+      matchSse({ type: "error", message: "Analysis failed" });
     }
-    res.end();
+    if (!res.writableEnded) res.end();
   });
 
   // Streaming Q&A — SSE endpoint, bypasses tRPC for progressive rendering
@@ -106,6 +114,22 @@ async function startServer() {
     res.setHeader("Content-Type", "text/event-stream");
     res.setHeader("Cache-Control", "no-cache");
     res.setHeader("Connection", "keep-alive");
+    res.setHeader("X-Accel-Buffering", "no");
+
+    const sse = (payload: object) => {
+      if (!res.writableEnded) {
+        res.write(`data: ${JSON.stringify(payload)}\n\n`);
+        (res as any).flush?.();
+      }
+    };
+
+    // Hard 45-second request timeout — client gets an error instead of hanging
+    const requestTimeout = setTimeout(() => {
+      console.warn("[stream-answer] Hard timeout after 45s");
+      sse({ error: true });
+      if (!res.writableEnded) res.end();
+    }, 45_000);
+    res.on("close", () => clearTimeout(requestTimeout));
 
     // Save user message to DB before streaming
     if (analysisId) {
@@ -125,11 +149,12 @@ async function startServer() {
       }
 
       for await (const event of streamAnswer(question, resolvedHistory)) {
+        if (res.writableEnded) break;
         if (event.type === "status") {
-          res.write(`data: ${JSON.stringify({ status: event.message })}\n\n`);
+          sse({ status: event.message });
         } else if (event.type === "chunk") {
           fullAnswer += event.text;
-          res.write(`data: ${JSON.stringify({ text: event.text })}\n\n`);
+          sse({ text: event.text });
         } else {
           // Save completed assistant message to DB
           if (analysisId) {
@@ -141,14 +166,15 @@ async function startServer() {
               tokensOutput: event.tokensOutput,
             });
           }
-          res.write(`data: ${JSON.stringify({ done: true, sources: event.sources, tokensInput: event.tokensInput, tokensOutput: event.tokensOutput })}\n\n`);
+          sse({ done: true, sources: event.sources, tokensInput: event.tokensInput, tokensOutput: event.tokensOutput });
         }
       }
     } catch (err) {
       console.error("[stream-answer] Error:", err);
-      res.write(`data: ${JSON.stringify({ error: true })}\n\n`);
+      sse({ error: true });
     }
-    res.end();
+    clearTimeout(requestTimeout);
+    if (!res.writableEnded) res.end();
   });
 
   // tRPC API

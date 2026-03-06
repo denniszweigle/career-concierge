@@ -616,12 +616,15 @@ export async function* streamAnswer(
   | { type: "chunk"; text: string }
   | { type: "done"; sources: AnswerSource[]; tokensInput: number; tokensOutput: number }
 > {
+  const t0 = Date.now();
   console.log(`[RAG stream] Q: "${question.substring(0, 80)}"`);
 
   yield { type: "status", message: "Embedding your question to prepare for semantic search..." };
   const queryEmbedding = await generateEmbedding(question);
+  console.log(`[RAG stream] embedding done ${Date.now() - t0}ms`);
 
   const allChunks = await loadChunkCache();
+  console.log(`[RAG stream] chunk cache ready ${Date.now() - t0}ms (${allChunks.length} chunks)`);
   yield { type: "status", message: `Scanning ${allChunks.length.toLocaleString()} portfolio passages for relevant content...` };
 
   const candidates: RetrievalCandidate[] = [];
@@ -662,6 +665,7 @@ export async function* streamAnswer(
   const sources = Array.from(sourceMap.values()).sort((a, b) => b.similarity - a.similarity);
 
   const uniqueFiles = new Set(relevantChunks.map(c => c.fileName));
+  console.log(`[RAG stream] cosine scan done ${Date.now() - t0}ms, top chunk sim=${((relevantChunks[0]?.similarity ?? 0) * 100).toFixed(1)}%`);
   yield {
     type: "status",
     message: `Retrieved ${relevantChunks.length} passages from ${uniqueFiles.size} document${uniqueFiles.size !== 1 ? "s" : ""} — composing a grounded response...`,
@@ -683,16 +687,41 @@ export async function* streamAnswer(
     ),
   ];
 
-  const stream = await llm.stream(messages);
+  console.log(`[RAG stream] starting llm.stream at ${Date.now() - t0}ms`);
+
+  // Abort if no tokens arrive within 20s of starting the stream
+  const firstChunkController = new AbortController();
+  const firstChunkTimer = setTimeout(() => firstChunkController.abort(), 20_000);
+
   let tokensIn = 0;
   let tokensOut = 0;
   let lastChunk: any = null;
+  let gotFirstChunk = false;
 
-  for await (const chunk of stream) {
-    lastChunk = chunk;
-    const text = typeof chunk.content === "string" ? chunk.content : "";
-    if (text) yield { type: "chunk", text };
+  try {
+    const stream = await llm.stream(messages, { signal: firstChunkController.signal });
+    for await (const chunk of stream) {
+      if (!gotFirstChunk) {
+        clearTimeout(firstChunkTimer);
+        gotFirstChunk = true;
+        console.log(`[RAG stream] first token at ${Date.now() - t0}ms`);
+      }
+      lastChunk = chunk;
+      const text = typeof chunk.content === "string" ? chunk.content : "";
+      if (text) yield { type: "chunk", text };
+    }
+  } catch (err: any) {
+    clearTimeout(firstChunkTimer);
+    if (firstChunkController.signal.aborted) {
+      console.error(`[RAG stream] LLM first-token timeout after 20s`);
+      throw new Error("LLM did not respond within 20 seconds — please try again");
+    }
+    throw err;
+  } finally {
+    clearTimeout(firstChunkTimer);
   }
+
+  console.log(`[RAG stream] stream complete at ${Date.now() - t0}ms`);
 
   if (lastChunk) {
     const usage = extractUsage(lastChunk);

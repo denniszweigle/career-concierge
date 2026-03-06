@@ -18,5 +18,6 @@ export const llm = new ChatOpenAI({
 export const embeddings = new OpenAIEmbeddings({
   model: ENV.embeddingModel,
   apiKey: ENV.forgeApiKey,
+  timeout: 10_000,
   configuration: { baseURL },
 });
