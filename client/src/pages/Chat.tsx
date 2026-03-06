@@ -1,7 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Loader2, Send, Sparkles, Bot, FileText } from "lucide-react";
-import { trpc } from "@/lib/trpc";
 import { useState, useRef, useEffect } from "react";
 import { toast } from "sonner";
 import { Streamdown } from "streamdown";
@@ -25,33 +24,78 @@ const SUGGESTED_PROMPTS = [
 export default function Chat() {
   const [history, setHistory] = useState<Message[]>([]);
   const [question, setQuestion] = useState("");
+  const [isStreaming, setIsStreaming] = useState(false);
+  const [streamingText, setStreamingText] = useState("");
   const chatEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const chatGeneral = trpc.analysis.chatGeneral.useMutation();
-
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [history, chatGeneral.isPending]);
+  }, [history, isStreaming, streamingText]);
 
   const handleAsk = async (q?: string) => {
     const text = (q ?? question).trim();
-    if (!text || chatGeneral.isPending) return;
+    if (!text || isStreaming) return;
 
     const userMsg: Message = { role: "user", content: text };
+    const priorHistory = history;
     const nextHistory = [...history, userMsg];
     setHistory(nextHistory);
     setQuestion("");
+    setIsStreaming(true);
+    setStreamingText("");
 
     try {
-      const { answer, sources } = await chatGeneral.mutateAsync({
-        question: text,
-        history: history.map(({ role, content }) => ({ role, content })),
+      const response = await fetch("/api/stream-answer", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          question: text,
+          history: priorHistory.map(({ role, content }) => ({ role, content })),
+        }),
       });
-      setHistory([...nextHistory, { role: "assistant", content: answer, sources }]);
+
+      if (!response.ok || !response.body) throw new Error("Stream failed");
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      let accumulated = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() ?? "";
+
+        for (const line of lines) {
+          if (!line.startsWith("data: ")) continue;
+          const payload = line.slice(6).trim();
+          if (!payload) continue;
+          try {
+            const data = JSON.parse(payload);
+            if (data.text) {
+              accumulated += data.text;
+              setStreamingText(accumulated);
+            } else if (data.done) {
+              setHistory(prev => [...prev, { role: "assistant", content: accumulated, sources: data.sources ?? [] }]);
+              setStreamingText("");
+              setIsStreaming(false);
+            } else if (data.error) {
+              throw new Error("Stream error from server");
+            }
+          } catch {
+            // ignore individual line parse errors
+          }
+        }
+      }
     } catch {
       toast.error("Failed to get answer");
-      setHistory(history);
+      setHistory(priorHistory);
+      setStreamingText("");
+      setIsStreaming(false);
     } finally {
       inputRef.current?.focus();
     }
@@ -83,7 +127,7 @@ export default function Chat() {
               <button
                 key={prompt}
                 onClick={() => handleAsk(prompt)}
-                disabled={chatGeneral.isPending}
+                disabled={isStreaming}
                 className="w-full text-left text-xs px-3 py-2.5 rounded-lg border border-border bg-muted/50 hover:bg-blue-50 dark:hover:bg-blue-950 hover:border-blue-200 dark:hover:border-blue-800 hover:text-blue-700 dark:hover:text-blue-300 transition-colors disabled:opacity-50 leading-snug"
               >
                 {prompt}
@@ -108,7 +152,7 @@ export default function Chat() {
 
           {/* Messages */}
           <div className="flex-1 overflow-y-auto px-6 py-6 space-y-4">
-            {!hasMessages && !chatGeneral.isPending && (
+            {!hasMessages && !isStreaming && (
               <div className="flex flex-col items-center justify-center h-full text-center text-muted-foreground space-y-3">
                 <Bot className="h-12 w-12 text-muted" />
                 <div>
@@ -160,7 +204,17 @@ export default function Chat() {
               </div>
             ))}
 
-            {chatGeneral.isPending && (
+            {isStreaming && streamingText && (
+              <div className="flex flex-col items-start">
+                <div className="max-w-[75%] rounded-2xl rounded-bl-sm px-4 py-3 text-sm bg-card border text-foreground shadow-sm">
+                  <div className="prose prose-sm prose-slate dark:prose-invert max-w-none">
+                    <Streamdown>{streamingText}</Streamdown>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {isStreaming && !streamingText && (
               <div className="flex justify-start">
                 <div className="bg-card border rounded-2xl rounded-bl-sm px-4 py-3 shadow-sm">
                   <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
@@ -180,13 +234,13 @@ export default function Chat() {
                 value={question}
                 onChange={e => setQuestion(e.target.value)}
                 onKeyDown={e => e.key === "Enter" && handleAsk()}
-                disabled={chatGeneral.isPending}
+                disabled={isStreaming}
               />
               <Button
                 onClick={() => handleAsk()}
-                disabled={chatGeneral.isPending || !question.trim()}
+                disabled={isStreaming || !question.trim()}
               >
-                {chatGeneral.isPending ? (
+                {isStreaming ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
                 ) : (
                   <Send className="h-4 w-4" />
