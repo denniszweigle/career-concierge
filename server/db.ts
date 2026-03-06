@@ -172,6 +172,17 @@ export async function saveDocumentChunk(chunk: InsertDocumentChunk): Promise<voi
   await db.insert(documentChunks).values(chunk);
 }
 
+export async function getDocumentByDriveFileId(driveFileId: string): Promise<Document | undefined> {
+  const db = getDb();
+  const result = await db.select().from(documents).where(eq(documents.driveFileId, driveFileId)).limit(1);
+  return result[0];
+}
+
+export async function deleteDocumentChunks(documentId: number): Promise<void> {
+  const db = getDb();
+  await db.delete(documentChunks).where(eq(documentChunks.documentId, documentId));
+}
+
 export async function getDocumentChunks(documentId: number): Promise<DocumentChunk[]> {
   const db = getDb();
   return db

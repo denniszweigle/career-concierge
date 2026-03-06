@@ -25,5 +25,5 @@ export const ENV = {
   ragTopKStage1: parseInt(process.env.RAG_TOP_K_STAGE1 ?? "50"),   // Stage 1: broad candidate pool
   ragTopKQA: parseInt(process.env.RAG_TOP_K_QA ?? "8"),            // Stage 2: final passages after re-rank
   ragTopKEvidence: parseInt(process.env.RAG_TOP_K_EVIDENCE ?? "8"),// Job matching evidence per requirement
-  ragStrengthThreshold: parseFloat(process.env.RAG_STRENGTH_THRESHOLD ?? "60"),
+  ragStrengthThreshold: parseFloat(process.env.RAG_STRENGTH_THRESHOLD ?? "50"),
 };

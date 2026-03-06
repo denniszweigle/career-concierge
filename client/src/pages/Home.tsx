@@ -1,97 +1,257 @@
-import { FileSearch, Brain, MessageSquare } from "lucide-react";
+import { useState, useEffect } from "react";
+import { useLocation } from "wouter";
+import { FileSearch, Brain, MessageSquare, ArrowRight, ChevronRight, Zap, GitBranch, Database, Box } from "lucide-react";
+
+const TYPING_PHRASES = [
+  "Principal Engineer",
+  "VP of Engineering",
+  "Platform Architect",
+  "Head of AI/ML",
+  "CTO",
+  "Sr. Developer",
+  "PBaaS Developer",
+  "Full Stack Engineer",
+  "RPA/APA",
+];
 
 export default function Home() {
+  const [, navigate] = useLocation();
+  const [phraseIndex, setPhraseIndex] = useState(0);
+  const [displayed, setDisplayed] = useState("");
+  const [typing, setTyping] = useState(true);
+
+  useEffect(() => {
+    const phrase = TYPING_PHRASES[phraseIndex]!;
+    if (typing) {
+      if (displayed.length < phrase.length) {
+        const t = setTimeout(() => setDisplayed(phrase.slice(0, displayed.length + 1)), 60);
+        return () => clearTimeout(t);
+      } else {
+        const t = setTimeout(() => setTyping(false), 1800);
+        return () => clearTimeout(t);
+      }
+    } else {
+      if (displayed.length > 0) {
+        const t = setTimeout(() => setDisplayed(displayed.slice(0, -1)), 30);
+        return () => clearTimeout(t);
+      } else {
+        setPhraseIndex((phraseIndex + 1) % TYPING_PHRASES.length);
+        setTyping(true);
+      }
+    }
+  }, [displayed, typing, phraseIndex]);
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50">
-      <header className="container mx-auto px-4 py-6">
-        <div className="flex justify-between items-center">
+    <div className="min-h-screen bg-[#050510] text-white overflow-x-hidden">
+      {/* Aurora background blobs */}
+      <div className="fixed inset-0 pointer-events-none overflow-hidden" aria-hidden>
+        <div
+          className="absolute top-[-15%] left-[-8%] w-[600px] h-[600px] rounded-full opacity-30 animate-pulse"
+          style={{ background: "radial-gradient(circle, rgba(99,102,241,0.5) 0%, transparent 70%)", filter: "blur(80px)" }}
+        />
+        <div
+          className="absolute top-[5%] right-[-5%] w-[500px] h-[500px] rounded-full opacity-25 animate-pulse"
+          style={{ background: "radial-gradient(circle, rgba(139,92,246,0.5) 0%, transparent 70%)", filter: "blur(80px)", animationDelay: "1s" }}
+        />
+        <div
+          className="absolute bottom-[-5%] left-[25%] w-[450px] h-[450px] rounded-full opacity-20 animate-pulse"
+          style={{ background: "radial-gradient(circle, rgba(59,130,246,0.5) 0%, transparent 70%)", filter: "blur(80px)", animationDelay: "2s" }}
+        />
+      </div>
+
+      {/* ── Hero ──────────────────────────────────────────────────────────── */}
+      <section className="relative z-10 container mx-auto px-6 py-16 lg:py-20">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
+
+          {/* Left — headline + CTAs */}
           <div>
-            <h1 className="text-2xl font-bold text-slate-900">Personal Career Concierge</h1>
-            <p className="text-sm text-slate-600">AI-Powered Portfolio Analysis</p>
-          </div>
-        </div>
-      </header>
+            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/[0.06] border border-white/10 text-xs text-slate-400 mb-8">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse flex-shrink-0" />
+              2-stage RAG · HyDE · LLM re-ranking · Streaming Q&A
+            </div>
 
-      <main className="container mx-auto px-4 py-12">
-        <div className="text-center max-w-3xl mx-auto mb-12">
-          <div className="flex justify-center mb-4">
-            <img
-              src="/profile2.jpg"
-              alt="Dennis DZ Zweigle"
-              width={80}
-              height={80}
-              className="rounded-full object-cover ring-2 ring-slate-200"
-              onError={e => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
-            />
+            <h1 className="text-5xl xl:text-6xl font-bold leading-tight tracking-tight mb-4">
+              The portfolio of{" "}
+              <span className="bg-gradient-to-r from-blue-400 via-violet-400 to-indigo-300 bg-clip-text text-transparent">
+                Dennis "DZ" Zweigle
+              </span>
+            </h1>
+
+            <p className="text-xl font-medium text-slate-400 mb-6 h-7">
+              Built for the{" "}
+              <span className="text-white font-semibold">
+                {displayed}
+                <span className="animate-pulse opacity-70">|</span>
+              </span>
+              {" "}role.
+            </p>
+
+            <p className="text-slate-400 text-base leading-relaxed mb-10 max-w-lg">
+              Paste any job description. Get a scored match report grounded in actual portfolio
+              documents — hard skills, experience depth, domain knowledge, and soft signals
+              weighted, explained, and cited.
+            </p>
+
+            <div className="flex flex-wrap gap-4">
+              <button
+                onClick={() => navigate("/match")}
+                className="flex items-center gap-2 px-6 py-3 rounded-lg font-semibold text-sm text-white transition-all shadow-lg shadow-blue-900/40"
+                style={{ background: "linear-gradient(135deg, #2563eb, #7c3aed)" }}
+                onMouseEnter={e => (e.currentTarget.style.background = "linear-gradient(135deg, #3b82f6, #8b5cf6)")}
+                onMouseLeave={e => (e.currentTarget.style.background = "linear-gradient(135deg, #2563eb, #7c3aed)")}
+              >
+                Analyze a Job Description
+                <ArrowRight className="h-4 w-4" />
+              </button>
+              <button
+                onClick={() => navigate("/chat")}
+                className="flex items-center gap-2 px-6 py-3 rounded-lg border border-white/15 text-slate-300 font-semibold text-sm hover:bg-white/[0.06] hover:text-white transition-colors"
+              >
+                Ask the Portfolio
+                <ChevronRight className="h-4 w-4" />
+              </button>
+            </div>
           </div>
-          <h2 className="text-5xl font-bold text-slate-900 mb-6">
-            Dennis DZ Zweigle Portfolio
-          </h2>
-          <p className="text-xl text-slate-600">
-          Welcome to a transparent look at my career. <br /><br /> This platform uses a 2 stagged RAG technology leveraging LangChain to analyze how my experience aligns with specific job roles. <br /><br />From the Dockerized deployment to the GitHub Actions CI/CD, every line of code was directed and architected by me, using AI as specialized tools to augment my solo full-stack development efforts. <br /><br />Go ahead—ask the site anything about my tech capabilities or my process.
+
+          {/* Right — match score mockup */}
+          <div className="hidden lg:block">
+            <div className="rounded-2xl border border-white/10 bg-white/[0.04] backdrop-blur-md p-6 shadow-2xl">
+              {/* Card header */}
+              <div className="flex items-center justify-between mb-5">
+                <div>
+                  <div className="text-sm font-semibold text-white">Principal Engineer — Platform</div>
+                  <div className="text-xs text-slate-500 mt-0.5">Dennis "DZ" Zweigle · Portfolio Match Report</div>
+                </div>
+                <span className="px-2 py-1 rounded-md bg-emerald-500/15 text-emerald-400 text-xs font-medium border border-emerald-500/25">
+                  Live Analysis
+                </span>
+              </div>
+
+              {/* Score cards */}
+              <div className="grid grid-cols-2 gap-3 mb-5">
+                <div className="rounded-xl bg-emerald-500/[0.08] border border-emerald-500/20 p-4">
+                  <div className="text-[11px] text-emerald-400 mb-1 uppercase tracking-wide">Match Score</div>
+                  <div className="text-3xl font-bold text-emerald-400">84.7%</div>
+                  <div className="text-[11px] text-slate-600 mt-1">Alignment with requirements</div>
+                </div>
+                <div className="rounded-xl bg-orange-500/[0.08] border border-orange-500/20 p-4">
+                  <div className="text-[11px] text-orange-400 mb-1 uppercase tracking-wide">Mismatch</div>
+                  <div className="text-3xl font-bold text-orange-400">15.3%</div>
+                  <div className="text-[11px] text-slate-600 mt-1">Gaps to address</div>
+                </div>
+              </div>
+
+              {/* Category bars */}
+              <div className="space-y-3 mb-5">
+                {[
+                  { label: "Hard Skills", pct: 88, weight: "40%", color: "#3b82f6" },
+                  { label: "Experience",  pct: 82, weight: "30%", color: "#8b5cf6" },
+                  { label: "Domain",      pct: 79, weight: "20%", color: "#6366f1" },
+                  { label: "Soft Skills", pct: 91, weight: "10%", color: "#14b8a6" },
+                ].map(({ label, pct, weight, color }) => (
+                  <div key={label}>
+                    <div className="flex justify-between text-xs mb-1.5">
+                      <span className="text-slate-400">{label} <span className="text-slate-600">({weight})</span></span>
+                      <span className="text-white font-medium">{pct}%</span>
+                    </div>
+                    <div className="h-1.5 bg-white/[0.06] rounded-full overflow-hidden">
+                      <div className="h-1.5 rounded-full" style={{ width: `${pct}%`, backgroundColor: color }} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Chat teaser */}
+              <div className="rounded-lg bg-white/[0.04] border border-white/[0.08] px-3 py-2.5 flex items-center gap-2">
+                <span className="text-xs text-slate-600 flex-1">Ask about experience with distributed systems…</span>
+                <div className="w-5 h-5 rounded bg-blue-600 flex items-center justify-center flex-shrink-0">
+                  <ArrowRight className="h-3 w-3 text-white" />
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </section>
+
+      {/* ── Capability strip ─────────────────────────────────────────────── */}
+      <section className="relative z-10 border-t border-white/[0.06] py-14">
+        <div className="container mx-auto px-6">
+          <p className="text-center text-[11px] text-slate-600 uppercase tracking-widest mb-10">
+            What the platform does
           </p>
-          <ul className="text-xl text-slate-600 mt-4 space-y-2 text-left list-disc list-inside">
-            <li>
-              To analyze a job description against this portfolio, visit{" "}
-              <a href="/match" className="text-blue-600 hover:underline">Match</a>
-            </li>
-            <li>
-              To view interactive job match reporting and export data for Power BI, visit{" "}
-              <a href="/reports" className="text-blue-600 hover:underline">Reports</a>
-            </li>
-            <li>
-              To learn more about the project, visit{" "}
-              <a href="/tech" className="text-blue-600 hover:underline">Tech</a>
-            </li>
-          </ul>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-5xl mx-auto mb-16">
-          <div className="bg-white rounded-xl p-6 shadow-sm border">
-            <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center mb-4">
-              <FileSearch className="h-6 w-6 text-blue-600" />
-            </div>
-            <h3 className="text-lg font-semibold text-slate-900 mb-2">Document Indexing</h3>
-            <p className="text-slate-600">
-              Portfolio documents including PDF, DOCX, PPTX, XLSX, and TXT files are indexed and
-              ready for semantic search.
-            </p>
-          </div>
-
-          <div className="bg-white rounded-xl p-6 shadow-sm border">
-            <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center mb-4">
-              <Brain className="h-6 w-6 text-purple-600" />
-            </div>
-            <h3 className="text-lg font-semibold text-slate-900 mb-2">AI-Powered Matching</h3>
-            <p className="text-slate-600">
-              Chain of Density algorithm analyzes job descriptions to identify both obvious and subtle
-              requirements for honest scoring.
-            </p>
-          </div>
-
-          <div className="bg-white rounded-xl p-6 shadow-sm border">
-            <div className="w-12 h-12 bg-teal-100 rounded-lg flex items-center justify-center mb-4">
-              <MessageSquare className="h-6 w-6 text-teal-600" />
-            </div>
-            <h3 className="text-lg font-semibold text-slate-900 mb-2">Conversational Q&A</h3>
-            <p className="text-slate-600">
-              Ask questions about experience, skills, and background with answers grounded in actual
-              portfolio documents.
-            </p>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 max-w-4xl mx-auto">
+            {[
+              {
+                icon: <FileSearch className="h-5 w-5 text-blue-400" />,
+                iconBg: "bg-blue-500/10 border-blue-500/20",
+                title: "2-Stage RAG Retrieval",
+                desc: "HyDE embeds a hypothetical answer passage first, Stage 1 runs cosine search across all indexed chunks, Stage 2 uses an LLM re-ranker for language-level precision.",
+              },
+              {
+                icon: <Brain className="h-5 w-5 text-violet-400" />,
+                iconBg: "bg-violet-500/10 border-violet-500/20",
+                title: "Chain of Density Extraction",
+                desc: "Four-pass requirement extraction surfaces obvious requirements, implicit preferences, subtle signals, and culture-embedded expectations from any job description.",
+              },
+              {
+                icon: <MessageSquare className="h-5 w-5 text-teal-400" />,
+                iconBg: "bg-teal-500/10 border-teal-500/20",
+                title: "Grounded Conversational Q&A",
+                desc: "Every answer is anchored to retrieved document passages with source citations. No hallucination, no training data leakage — streams progressively from first token.",
+              },
+            ].map(({ icon, iconBg, title, desc }) => (
+              <div
+                key={title}
+                className="rounded-xl bg-white/[0.03] border border-white/[0.07] p-5 hover:bg-white/[0.06] transition-colors"
+              >
+                <div className={`w-9 h-9 rounded-lg border flex items-center justify-center mb-4 ${iconBg}`}>
+                  {icon}
+                </div>
+                <h3 className="text-sm font-semibold text-white mb-2">{title}</h3>
+                <p className="text-xs text-slate-500 leading-relaxed">{desc}</p>
+              </div>
+            ))}
           </div>
         </div>
+      </section>
 
-      </main>
-
-      <footer className="container mx-auto px-4 py-8 mt-16 border-t">
-        <div className="text-center text-sm text-slate-600">
-          <p>Personal Career Concierge for Dennis "DZ" Zweigle</p>
-          <p className="mt-2">Powered by RAG technology and LLM-based semantic analysis</p>
-          <p className="mt-2">
-            <a href="/admin" className="text-slate-400 hover:text-slate-600 transition-colors">
-              Admin
-            </a>
+      {/* ── Tech credibility bar ─────────────────────────────────────────── */}
+      <section className="relative z-10 border-t border-white/[0.06] py-10">
+        <div className="container mx-auto px-6">
+          <p className="text-center text-[11px] text-slate-600 uppercase tracking-widest mb-7">
+            Built with
           </p>
+          <div className="flex flex-wrap justify-center items-center gap-x-8 gap-y-4">
+            {[
+              { name: "React 19",              icon: <Zap       className="h-3.5 w-3.5" /> },
+              { name: "tRPC 11",               icon: <GitBranch className="h-3.5 w-3.5" /> },
+              { name: "LangChain",             icon: <Brain     className="h-3.5 w-3.5" /> },
+              { name: "SQLite + Drizzle",      icon: <Database  className="h-3.5 w-3.5" /> },
+              { name: "OpenAI Embeddings",     icon: <Brain     className="h-3.5 w-3.5" /> },
+              { name: "Docker + Caddy",        icon: <Box       className="h-3.5 w-3.5" /> },
+              { name: "GitHub Actions CI/CD",  icon: <GitBranch className="h-3.5 w-3.5" /> },
+              { name: "Hetzner VPS",           icon: <Box       className="h-3.5 w-3.5" /> },
+            ].map(({ name, icon }) => (
+              <div
+                key={name}
+                className="flex items-center gap-1.5 text-xs text-slate-600 hover:text-slate-300 transition-colors"
+              >
+                {icon}
+                <span>{name}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── Footer ───────────────────────────────────────────────────────── */}
+      <footer className="relative z-10 border-t border-white/[0.06] py-6">
+        <div className="container mx-auto px-6 flex justify-between items-center">
+          <p className="text-xs text-slate-700">Personal Career Concierge · Dennis "DZ" Zweigle</p>
+          <a href="/admin" className="text-xs text-slate-700 hover:text-slate-400 transition-colors">
+            Admin
+          </a>
         </div>
       </footer>
     </div>

@@ -8,6 +8,8 @@ import { registerGoogleDriveCallback } from "../googleDriveCallback";
 import { registerDevLogin } from "../devLogin";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
+import { streamAnswer } from "../matchingEngine";
+import { saveChatMessage, getChatMessages } from "../db";
 import { serveStatic, setupVite } from "./vite";
 
 function isPortAvailable(port: number): Promise<boolean> {
@@ -41,6 +43,65 @@ async function startServer() {
   registerOAuthRoutes(app);
   // Google Drive OAuth callback
   registerGoogleDriveCallback(app);
+  // Streaming Q&A — SSE endpoint, bypasses tRPC for progressive rendering
+  app.post("/api/stream-answer", async (req, res) => {
+    const { question, history, analysisId } = req.body as {
+      question: string;
+      history: Array<{ role: "user" | "assistant"; content: string }>;
+      analysisId?: number;
+    };
+
+    if (!question || typeof question !== "string") {
+      res.status(400).json({ error: "question required" });
+      return;
+    }
+
+    res.setHeader("Content-Type", "text/event-stream");
+    res.setHeader("Cache-Control", "no-cache");
+    res.setHeader("Connection", "keep-alive");
+
+    // Save user message to DB before streaming
+    if (analysisId) {
+      await saveChatMessage({ analysisId, role: "user", content: question });
+    }
+
+    let fullAnswer = "";
+    try {
+      // Build history from DB if analysisId provided (so history param is optional)
+      let resolvedHistory = history ?? [];
+      if (analysisId && (!history || history.length === 0)) {
+        const msgs = await getChatMessages(analysisId);
+        // Exclude the user message we just saved (last one)
+        resolvedHistory = msgs
+          .slice(0, -1)
+          .map(m => ({ role: m.role as "user" | "assistant", content: m.content }));
+      }
+
+      for await (const event of streamAnswer(question, resolvedHistory)) {
+        if (event.type === "chunk") {
+          fullAnswer += event.text;
+          res.write(`data: ${JSON.stringify({ text: event.text })}\n\n`);
+        } else {
+          // Save completed assistant message to DB
+          if (analysisId) {
+            await saveChatMessage({
+              analysisId,
+              role: "assistant",
+              content: fullAnswer,
+              tokensInput: event.tokensInput,
+              tokensOutput: event.tokensOutput,
+            });
+          }
+          res.write(`data: ${JSON.stringify({ done: true, sources: event.sources })}\n\n`);
+        }
+      }
+    } catch (err) {
+      console.error("[stream-answer] Error:", err);
+      res.write(`data: ${JSON.stringify({ error: true })}\n\n`);
+    }
+    res.end();
+  });
+
   // tRPC API
   app.use(
     "/api/trpc",

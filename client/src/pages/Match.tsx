@@ -34,12 +34,12 @@ export default function Match() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50">
+    <div className="min-h-screen bg-background">
       <main className="container mx-auto px-4 py-12">
 
         <div className="text-center max-w-3xl mx-auto mb-12">
-          <h1 className="text-4xl font-bold text-slate-900 mb-4">Analyze a Job Description</h1>
-          <p className="text-xl text-slate-600">
+          <h1 className="text-4xl font-bold text-foreground mb-4">Analyze a Job Description</h1>
+          <p className="text-xl text-muted-foreground">
             Paste any job description to match it against Dennis "DZ" Zweigle's indexed portfolio
             documents and receive a transparent Match vs. Mismatch report.
           </p>
@@ -98,8 +98,8 @@ export default function Match() {
         </Card>
 
         {/* How It Works */}
-        <div className="max-w-3xl mx-auto bg-white rounded-xl p-8 shadow-sm border">
-          <h3 className="text-2xl font-bold text-slate-900 mb-4">How It Works</h3>
+        <div className="max-w-3xl mx-auto bg-card rounded-xl p-8 shadow-sm border">
+          <h3 className="text-2xl font-bold text-foreground mb-4">How It Works</h3>
           <div className="space-y-4">
             {[
               {
@@ -128,8 +128,8 @@ export default function Match() {
                   {step.n}
                 </div>
                 <div>
-                  <h4 className="font-semibold text-slate-900">{step.title}</h4>
-                  <p className="text-slate-600">{step.body}</p>
+                  <h4 className="font-semibold text-foreground">{step.title}</h4>
+                  <p className="text-muted-foreground">{step.body}</p>
                 </div>
               </div>
             ))}

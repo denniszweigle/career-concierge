@@ -281,7 +281,7 @@ const SECTIONS: TechSection[] = [
     title: "Developer Experience",
     description: "Tooling that keeps the build fast and the code consistent",
     icon: Wrench,
-    color: "text-slate-600",
+    color: "text-muted-foreground",
     items: [
       {
         name: "Vite 7",
@@ -352,7 +352,7 @@ function TechCard({ item, link }: { item: TechItem; link: string }) {
       rel="noopener noreferrer"
       className={`block h-full ${hasLink ? "cursor-pointer" : "cursor-default"}`}
     >
-      <Card className={`h-full transition-shadow border-slate-200 ${hasLink ? "hover:shadow-md hover:border-slate-300" : ""}`}>
+      <Card className={`h-full transition-shadow border-border ${hasLink ? "hover:shadow-md hover:border-slate-300" : ""}`}>
         <CardHeader className="pb-3">
           <div className="flex items-start justify-between gap-2">
             <CardTitle className="text-base">{item.name}</CardTitle>
@@ -362,7 +362,7 @@ function TechCard({ item, link }: { item: TechItem; link: string }) {
           </div>
         </CardHeader>
         <CardContent>
-          <p className="text-sm text-slate-600 leading-relaxed">{item.why}</p>
+          <p className="text-sm text-muted-foreground leading-relaxed">{item.why}</p>
         </CardContent>
       </Card>
     </a>
@@ -371,13 +371,13 @@ function TechCard({ item, link }: { item: TechItem; link: string }) {
 
 export default function Tech() {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
+    <div className="min-h-screen bg-background">
       <div className="container mx-auto px-4 py-10 max-w-6xl">
 
         {/* Page header */}
         <div className="mb-10">
-          <h1 className="text-3xl font-bold text-slate-900">Stack</h1>
-          <p className="text-slate-500 mt-2 max-w-2xl">
+          <h1 className="text-3xl font-bold text-foreground">Stack</h1>
+          <p className="text-muted-foreground mt-2 max-w-2xl">
             The AI tools that shaped this project and every library chosen to build it — with the reasoning behind each decision.
           </p>
         </div>
@@ -385,16 +385,16 @@ export default function Tech() {
         {/* RAG Pipeline */}
         <div className="mb-12">
           <div className="flex items-center gap-3 mb-6">
-            <div className="p-2 rounded-lg bg-white border shadow-sm">
+            <div className="p-2 rounded-lg bg-card border shadow-sm">
               <GitBranch className="h-5 w-5 text-blue-600" />
             </div>
             <div>
-              <h2 className="text-xl font-bold text-slate-900">RAG Pipeline Architecture</h2>
-              <p className="text-sm text-slate-500">2-stage LangChain retrieval — how answers are grounded in portfolio documents</p>
-              <p className="text-sm text-slate-500">- Business ideation and website skeleton layout in Manus.AI in 8 hours</p>
-              <p className="text-sm text-slate-500">- technical implementation in 48 hours</p>
-              <p className="text-sm text-slate-500">- git pipeline 8 hours</p>
-              <p className="text-sm text-slate-500">- Push to production 8 hours</p>
+              <h2 className="text-xl font-bold text-foreground">RAG Pipeline Architecture</h2>
+              <p className="text-sm text-muted-foreground">2-stage LangChain retrieval — how answers are grounded in portfolio documents</p>
+              <p className="text-sm text-muted-foreground">- Business ideation and website skeleton layout in Manus.AI in 8 hours</p>
+              <p className="text-sm text-muted-foreground">- technical implementation in 48 hours</p>
+              <p className="text-sm text-muted-foreground">- git pipeline 8 hours</p>
+              <p className="text-sm text-muted-foreground">- Push to production 8 hours</p>
             </div>
           </div>
 
@@ -414,16 +414,16 @@ export default function Tech() {
                 ].map((step, i, arr) => (
                   <div key={step.label} className="flex items-center gap-2">
                     <div className="text-center">
-                      <div className="font-semibold text-slate-900 text-xs">{step.label}</div>
-                      <div className="text-[10px] text-slate-500 max-w-[120px]">{step.sub}</div>
+                      <div className="font-semibold text-foreground text-xs">{step.label}</div>
+                      <div className="text-[10px] text-muted-foreground max-w-[120px]">{step.sub}</div>
                     </div>
                     {i < arr.length - 1 && (
-                      <span className="text-slate-300 font-bold text-lg hidden sm:block">→</span>
+                      <span className="text-muted-foreground font-bold text-lg hidden sm:block">→</span>
                     )}
                   </div>
                 ))}
               </div>
-              <p className="text-sm text-slate-600 mt-4 leading-relaxed">
+              <p className="text-sm text-muted-foreground mt-4 leading-relaxed">
                 <strong>Why two stages?</strong> A single embedding similarity pass over 101,570 chunks fails when question vocabulary differs from document vocabulary — "measurable business impact" scores poorly against "$130 Trillion tokenization market" even though they describe the same thing. Stage 1 casts a broad net (top 50 by cosine proximity). Stage 2 uses full language understanding to select the 8 most relevant passages regardless of surface-level word overlap.
               </p>
             </CardContent>
@@ -437,12 +437,12 @@ export default function Tech() {
               <div className="overflow-x-auto">
                 <table className="w-full text-sm border-collapse">
                   <thead>
-                    <tr className="border-b border-slate-200">
-                      <th className="text-left py-2 pr-4 text-xs font-semibold text-slate-500 uppercase tracking-wide">Reranker</th>
-                      <th className="text-left py-2 pr-4 text-xs font-semibold text-slate-500 uppercase tracking-wide">Type</th>
-                      <th className="text-left py-2 pr-4 text-xs font-semibold text-slate-500 uppercase tracking-wide">Integration</th>
-                      <th className="text-left py-2 pr-4 text-xs font-semibold text-slate-500 uppercase tracking-wide">Extra API Key</th>
-                      <th className="text-left py-2 text-xs font-semibold text-slate-500 uppercase tracking-wide">Best For</th>
+                    <tr className="border-b border-border">
+                      <th className="text-left py-2 pr-4 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Reranker</th>
+                      <th className="text-left py-2 pr-4 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Type</th>
+                      <th className="text-left py-2 pr-4 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Integration</th>
+                      <th className="text-left py-2 pr-4 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Extra API Key</th>
+                      <th className="text-left py-2 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Best For</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
@@ -453,17 +453,17 @@ export default function Tech() {
                       { name: "LLM-as-judge ✓", type: "Listwise LLM", integration: "Already wired (withStructuredOutput)", key: "No", bestFor: "Complex semantic reasoning; domain-aware", selected: true },
                     ].map(row => (
                       <tr key={row.name} className={row.selected ? "bg-blue-50" : ""}>
-                        <td className={`py-2.5 pr-4 font-medium ${row.selected ? "text-blue-700" : "text-slate-800"}`}>{row.name}</td>
-                        <td className="py-2.5 pr-4 text-slate-600 text-xs">{row.type}</td>
-                        <td className="py-2.5 pr-4 text-slate-600 font-mono text-[11px]">{row.integration}</td>
-                        <td className="py-2.5 pr-4 text-slate-600 text-xs">{row.key}</td>
-                        <td className="py-2.5 text-slate-600 text-xs">{row.bestFor}</td>
+                        <td className={`py-2.5 pr-4 font-medium ${row.selected ? "text-blue-700" : "text-foreground"}`}>{row.name}</td>
+                        <td className="py-2.5 pr-4 text-muted-foreground text-xs">{row.type}</td>
+                        <td className="py-2.5 pr-4 text-muted-foreground font-mono text-[11px]">{row.integration}</td>
+                        <td className="py-2.5 pr-4 text-muted-foreground text-xs">{row.key}</td>
+                        <td className="py-2.5 text-muted-foreground text-xs">{row.bestFor}</td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
-              <p className="text-sm text-slate-600 mt-4 leading-relaxed">
+              <p className="text-sm text-muted-foreground mt-4 leading-relaxed">
                 <strong>Why LLM-as-judge?</strong> Cross-encoders (Cohere, Jina, Qwen) are trained on generic English text pairs and rank by surface relevance. For this portfolio's domain — Proof of Governance, blockchain consensus, $130T institutional asset tokenization — the same model already used for answer generation understands the specialized vocabulary and selects passages by meaning, not keyword proximity. No additional API key, no cold-start latency, and the reranker improves automatically as the underlying LLM is upgraded.
               </p>
             </CardContent>
@@ -472,8 +472,8 @@ export default function Tech() {
 
         {/* Business Stack */}
         <div className="mb-12">
-          <h2 className="text-xl font-bold text-slate-900 mb-1">Business Stack</h2>
-          <p className="text-sm text-slate-500 mb-6">The AI tools that made this project possible — from concept to code.</p>
+          <h2 className="text-xl font-bold text-foreground mb-1">Business Stack</h2>
+          <p className="text-sm text-muted-foreground mb-6">The AI tools that made this project possible — from concept to code.</p>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {BUSINESS_TOOLS.map(tool => {
               const Icon = tool.icon;
@@ -485,11 +485,11 @@ export default function Tech() {
                   rel="noopener noreferrer"
                   className="block"
                 >
-                  <Card className="h-full hover:shadow-md transition-shadow border-slate-200 hover:border-slate-300">
+                  <Card className="h-full hover:shadow-md transition-shadow border-border hover:border-slate-300">
                     <CardHeader className="pb-3">
                       <div className="flex items-start justify-between gap-3">
                         <div className="flex items-center gap-3">
-                          <div className="p-2 rounded-lg bg-white border shadow-sm">
+                          <div className="p-2 rounded-lg bg-card border shadow-sm">
                             <Icon className={`h-5 w-5 ${tool.color}`} />
                           </div>
                           <div>
@@ -503,7 +503,7 @@ export default function Tech() {
                       </div>
                     </CardHeader>
                     <CardContent>
-                      <p className="text-sm text-slate-600 leading-relaxed whitespace-pre-line">{tool.description}</p>
+                      <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-line">{tool.description}</p>
                     </CardContent>
                   </Card>
                 </a>
@@ -514,8 +514,8 @@ export default function Tech() {
 
         {/* Technology Stack heading */}
         <div className="mb-8">
-          <h2 className="text-xl font-bold text-slate-900 mb-1">Technology Stack</h2>
-          <p className="text-sm text-slate-500">Libraries and frameworks — what each one does and why it was chosen.</p>
+          <h2 className="text-xl font-bold text-foreground mb-1">Technology Stack</h2>
+          <p className="text-sm text-muted-foreground">Libraries and frameworks — what each one does and why it was chosen.</p>
         </div>
 
         {/* Sections */}
@@ -525,12 +525,12 @@ export default function Tech() {
             return (
               <section key={section.title}>
                 <div className="flex items-center gap-3 mb-4">
-                  <div className={`p-2 rounded-lg bg-white border shadow-sm`}>
+                  <div className={`p-2 rounded-lg bg-card border shadow-sm`}>
                     <Icon className={`h-5 w-5 ${section.color}`} />
                   </div>
                   <div>
-                    <h2 className="text-lg font-semibold text-slate-900">{section.title}</h2>
-                    <p className="text-xs text-slate-500">{section.description}</p>
+                    <h2 className="text-lg font-semibold text-foreground">{section.title}</h2>
+                    <p className="text-xs text-muted-foreground">{section.description}</p>
                   </div>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">

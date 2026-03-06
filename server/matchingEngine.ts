@@ -3,7 +3,7 @@ import { SystemMessage, HumanMessage } from "@langchain/core/messages";
 import { llm } from "./_core/llm";
 import { ENV } from "./_core/env";
 import { generateEmbedding, cosineSimilarity } from "./vectorEmbedding";
-import { getChunksBatch, getChunksBatchWithDocuments } from "./db";
+import { getChunksBatchWithDocuments } from "./db";
 
 const CHUNK_BATCH_SIZE = 5_000;
 
@@ -33,8 +33,6 @@ export type AnswerSource = {
 
 // ---------------------------------------------------------------------------
 // Grounding directive injected into every system prompt.
-// Instructs the model to use ONLY the provided context and never its training
-// knowledge about the candidate or any external sources.
 // ---------------------------------------------------------------------------
 const GROUNDING_DIRECTIVE = `
 CRITICAL CONSTRAINTS — you MUST follow these without exception:
@@ -43,6 +41,36 @@ CRITICAL CONSTRAINTS — you MUST follow these without exception:
 - Do NOT invent, extrapolate, or assume facts that are not explicitly present in the provided text.
 - If the provided context does not contain sufficient information to answer something, say so clearly and stop — do not fill in gaps with guesses.
 `.trim();
+
+// ---------------------------------------------------------------------------
+// In-memory chunk cache — populated on first request, cleared after sync
+// ---------------------------------------------------------------------------
+type CachedChunk = Awaited<ReturnType<typeof getChunksBatchWithDocuments>>[number];
+
+let chunkCache: CachedChunk[] | null = null;
+
+export function clearChunkCache(): void {
+  chunkCache = null;
+  console.log("[RAG] Chunk cache cleared");
+}
+
+async function loadChunkCache(): Promise<CachedChunk[]> {
+  if (chunkCache) return chunkCache;
+
+  const chunks: CachedChunk[] = [];
+  let offset = 0;
+  while (true) {
+    const batch = await getChunksBatchWithDocuments(offset, CHUNK_BATCH_SIZE);
+    if (batch.length === 0) break;
+    chunks.push(...batch);
+    if (batch.length < CHUNK_BATCH_SIZE) break;
+    offset += CHUNK_BATCH_SIZE;
+  }
+
+  chunkCache = chunks;
+  console.log(`[RAG] Chunk cache populated: ${chunks.length} chunks`);
+  return chunks;
+}
 
 // ---------------------------------------------------------------------------
 // Schemas
@@ -127,7 +155,7 @@ export async function matchJobDescription(
     ...requirements.softSkills,
   ];
 
-  const allEvidence = await findEvidenceForRequirementsBatched(allRequirements);
+  const allEvidence = await findEvidenceForRequirements(allRequirements);
 
   const hardSkillsEvidence  = allEvidence.slice(0, requirements.hardSkills.length);
   const experienceEvidence  = allEvidence.slice(requirements.hardSkills.length, requirements.hardSkills.length + requirements.experienceRequirements.length);
@@ -168,51 +196,34 @@ export async function matchJobDescription(
 }
 
 // ---------------------------------------------------------------------------
-// RAG helpers — batched to avoid loading 100K+ embeddings into memory at once
+// RAG helpers — uses in-memory chunk cache for performance
 // ---------------------------------------------------------------------------
 
 /**
- * For each requirement string, finds the top-K most similar chunks by
- * processing the DB in batches of CHUNK_BATCH_SIZE so that at most
- * CHUNK_BATCH_SIZE embeddings are in memory at any time.
+ * For each requirement string, finds the top-K most similar chunks
+ * using the in-memory chunk cache.
  */
-async function findEvidenceForRequirementsBatched(
+async function findEvidenceForRequirements(
   requirements: string[]
 ): Promise<EvidenceItem[]> {
   if (requirements.length === 0) return [];
 
   const topK = ENV.ragTopKEvidence;
-  // Embed all requirements up front (one API call each, done in parallel)
+  // Embed all requirements up front in parallel
   const reqEmbeddings = await Promise.all(requirements.map(r => generateEmbedding(r)));
 
-  // candidates[i] = running top-K * 4 for requirements[i]
+  const allChunks = await loadChunkCache();
+
   type Candidate = { content: string; similarity: number };
   const candidates: Candidate[][] = requirements.map(() => []);
 
-  let offset = 0;
-  while (true) {
-    const batch = await getChunksBatch(offset, CHUNK_BATCH_SIZE);
-    if (batch.length === 0) break;
-
-    for (const chunk of batch) {
-      if (!chunk.embedding || !Array.isArray(chunk.embedding)) continue;
-      const emb = chunk.embedding as number[];
-      for (let ri = 0; ri < reqEmbeddings.length; ri++) {
-        const sim = cosineSimilarity(reqEmbeddings[ri]!, emb);
-        candidates[ri]!.push({ content: chunk.content, similarity: sim });
-      }
+  for (const chunk of allChunks) {
+    if (!chunk.embedding || !Array.isArray(chunk.embedding)) continue;
+    const emb = chunk.embedding as number[];
+    for (let ri = 0; ri < reqEmbeddings.length; ri++) {
+      const sim = cosineSimilarity(reqEmbeddings[ri]!, emb);
+      candidates[ri]!.push({ content: chunk.content, similarity: sim });
     }
-
-    // Prune each requirement's candidates to topK * 4 after every batch
-    for (const list of candidates) {
-      if (list.length > topK * 4) {
-        list.sort((a, b) => b.similarity - a.similarity);
-        list.splice(topK * 4);
-      }
-    }
-
-    if (batch.length < CHUNK_BATCH_SIZE) break;
-    offset += CHUNK_BATCH_SIZE;
   }
 
   return requirements.map((requirement, ri) => {
@@ -271,10 +282,10 @@ async function generateDetailedAnalysis(
     .slice(0, 3)
     .map(e => `${e.category}: ${e.requirement}`);
 
-  // Build an evidence summary to pass to the LLM so it has concrete text to cite
+  // Build an evidence summary — send top 3 passages per item for richer context
   const evidenceSummary = allEvidence
     .slice(0, 10)
-    .map(e => `[${e.category} | score ${e.score.toFixed(0)}%] ${e.requirement}\n  Evidence: ${e.evidence[0] ?? "none"}`)
+    .map(e => `[${e.category} | score ${e.score.toFixed(0)}%] ${e.requirement}\n  Evidence: ${e.evidence.slice(0, 3).join("\n---\n") || "none"}`)
     .join("\n\n");
 
   const response = await llm.invoke([
@@ -328,10 +339,6 @@ Report structure:
 
 // ---------------------------------------------------------------------------
 // Stage 2 — LLM re-ranker
-// Sends 300-char previews of all Stage 1 candidates to the LLM in a single
-// structured-output call. The LLM selects the topN most relevant passage IDs
-// using full language understanding rather than cosine proximity alone.
-// Falls back to embedding-ranked order silently if structured output fails.
 // ---------------------------------------------------------------------------
 async function rerankChunks<T extends { content: string; fileName: string }>(
   question: string,
@@ -378,9 +385,6 @@ async function rerankChunks<T extends { content: string; fileName: string }>(
 
 // ---------------------------------------------------------------------------
 // HyDE — Hypothetical Document Embedding
-// Generates a short hypothetical answer to the question and embeds *that*
-// instead of the raw question. The resulting vector is semantically much
-// closer to actual portfolio document language, dramatically improving recall.
 // ---------------------------------------------------------------------------
 async function generateHypotheticalPassage(question: string): Promise<{ passage: string; tokensInput: number; tokensOutput: number }> {
   const response = await llm.invoke([
@@ -398,76 +402,55 @@ async function generateHypotheticalPassage(question: string): Promise<{ passage:
 }
 
 // ---------------------------------------------------------------------------
-// Conversational Q&A — strictly grounded in retrieved portfolio chunks
+// Shared retrieval helper used by both answerQuestion and streamAnswer
 // ---------------------------------------------------------------------------
-export async function answerQuestion(
+type RetrievalCandidate = {
+  content: string;
+  similarity: number;
+  documentId: number;
+  fileName: string;
+  driveFileId: string;
+  fileType: string;
+};
+
+async function retrievePassages(
   question: string,
-  conversationHistory: Array<{ role: "user" | "assistant"; content: string }>
-): Promise<{ answer: string; sources: AnswerSource[]; tokensInput: number; tokensOutput: number }> {
-  // HyDE: embed a hypothetical answer passage rather than the raw question
-  // to maximise semantic overlap with the actual portfolio document vocabulary
-  const { passage: hypotheticalPassage, tokensInput: hydeIn, tokensOutput: hydeOut } =
-    await generateHypotheticalPassage(question);
-  const queryEmbedding = await generateEmbedding(hypotheticalPassage);
-  const topK = ENV.ragTopKQA;
+  queryEmbedding: number[]
+): Promise<{ relevantChunks: RetrievalCandidate[]; sources: AnswerSource[] }> {
+  const listKeywords = /\b(all|every|list|enumerate|how many|count)\b/i;
+  const isListQuery = listKeywords.test(question);
+  const topK = isListQuery ? ENV.ragTopKQA * 4 : ENV.ragTopKQA;
+  const stage1K = isListQuery ? ENV.ragTopKStage1 * 3 : ENV.ragTopKStage1;
 
-  type Candidate = {
-    content: string;
-    similarity: number;
-    documentId: number;
-    fileName: string;
-    driveFileId: string;
-    fileType: string;
-  };
+  const allChunks = await loadChunkCache();
+  const candidates: RetrievalCandidate[] = [];
 
-  let candidates: Candidate[] = [];
-  let offset = 0;
-
-  while (true) {
-    const batch = await getChunksBatchWithDocuments(offset, CHUNK_BATCH_SIZE);
-    if (batch.length === 0) break;
-
-    for (const c of batch) {
-      if (!c.embedding || !Array.isArray(c.embedding)) continue;
-      candidates.push({
-        content: c.content,
-        similarity: cosineSimilarity(queryEmbedding, c.embedding as number[]),
-        documentId: c.documentId,
-        fileName: c.fileName,
-        driveFileId: c.driveFileId,
-        fileType: c.fileType,
-      });
-    }
-
-    // Prune to Stage 1 pool size after each batch to cap memory
-    if (candidates.length > ENV.ragTopKStage1) {
-      candidates.sort((a, b) => b.similarity - a.similarity);
-      candidates = candidates.slice(0, ENV.ragTopKStage1);
-    }
-
-    if (batch.length < CHUNK_BATCH_SIZE) break;
-    offset += CHUNK_BATCH_SIZE;
+  for (const c of allChunks) {
+    if (!c.embedding || !Array.isArray(c.embedding)) continue;
+    candidates.push({
+      content: c.content,
+      similarity: cosineSimilarity(queryEmbedding, c.embedding as number[]),
+      documentId: c.documentId,
+      fileName: c.fileName,
+      driveFileId: c.driveFileId,
+      fileType: c.fileType,
+    });
   }
 
-  // Stage 1 result: top-50 by embedding similarity
+  // Stage 1: top-N by embedding similarity
   const stage1 = candidates
     .sort((a, b) => b.similarity - a.similarity)
-    .slice(0, ENV.ragTopKStage1);
+    .slice(0, stage1K);
 
-  console.log(`[RAG] Q: "${question.substring(0, 80)}"`);
-  console.log(`[RAG] HyDE: "${hypotheticalPassage.substring(0, 120)}"`);
-  console.log(`[RAG] HyDE tokens: in=${hydeIn} out=${hydeOut}`);
-  console.log(`[RAG] Stage 1: ${stage1.length} candidates, best sim=${((stage1[0]?.similarity ?? 0) * 100).toFixed(1)}%`);
+  console.log(`[RAG] Stage 1: ${stage1.length} candidates (listQuery=${isListQuery}), best sim=${((stage1[0]?.similarity ?? 0) * 100).toFixed(1)}%`);
 
-  // Stage 2: LLM re-ranker narrows to final topK (8) using language understanding
+  // Stage 2: LLM re-ranker
   const relevantChunks = await rerankChunks(question, stage1, topK);
 
   console.log(`[RAG] Stage 2: ${relevantChunks.length} passages selected`);
   relevantChunks.forEach((c, i) =>
     console.log(`[RAG] #${i + 1} file=${c.fileName} | ${c.content.substring(0, 100)}`)
   );
-
-  const context = relevantChunks.map((c, i) => `[Passage ${i + 1} — from ${c.fileName}]\n${c.content}`).join("\n\n");
 
   // Deduplicate sources by documentId, keeping highest similarity per doc
   const sourceMap = new Map<number, AnswerSource>();
@@ -485,18 +468,40 @@ export async function answerQuestion(
   }
   const sources = Array.from(sourceMap.values()).sort((a, b) => b.similarity - a.similarity);
 
+  return { relevantChunks, sources };
+}
+
+const QA_SYSTEM_PROMPT = `You are a knowledgeable assistant answering questions about Dennis "DZ" Zweigle's career, based on his indexed portfolio documents.
+
+${GROUNDING_DIRECTIVE}
+
+Use the retrieved passages as your primary source. When a passage describes a market opportunity, technology, or initiative that Dennis has created or is driving, treat that as evidence of his business impact and explain it clearly. Only use the phrase "The portfolio documents do not contain information about that" if the retrieved passages are entirely unrelated to the question — not simply because the phrasing differs from the question. Synthesize and interpret what is present rather than refusing to engage.`;
+
+// ---------------------------------------------------------------------------
+// Conversational Q&A — strictly grounded in retrieved portfolio chunks
+// ---------------------------------------------------------------------------
+export async function answerQuestion(
+  question: string,
+  conversationHistory: Array<{ role: "user" | "assistant"; content: string }>
+): Promise<{ answer: string; sources: AnswerSource[]; tokensInput: number; tokensOutput: number }> {
+  const { passage: hypotheticalPassage, tokensInput: hydeIn, tokensOutput: hydeOut } =
+    await generateHypotheticalPassage(question);
+  const queryEmbedding = await generateEmbedding(hypotheticalPassage);
+
+  console.log(`[RAG] Q: "${question.substring(0, 80)}"`);
+  console.log(`[RAG] HyDE: "${hypotheticalPassage.substring(0, 120)}"`);
+  console.log(`[RAG] HyDE tokens: in=${hydeIn} out=${hydeOut}`);
+
+  const { relevantChunks, sources } = await retrievePassages(question, queryEmbedding);
+
+  const context = relevantChunks.map((c, i) => `[Passage ${i + 1} — from ${c.fileName}]\n${c.content}`).join("\n\n");
+
   const historyMessages = conversationHistory.map(m =>
     m.role === "user" ? new HumanMessage(m.content) : new SystemMessage(m.content)
   );
 
   const response = await llm.invoke([
-    new SystemMessage(
-      `You are a knowledgeable assistant answering questions about Dennis "DZ" Zweigle's career, based on his indexed portfolio documents.
-
-${GROUNDING_DIRECTIVE}
-
-Use the retrieved passages as your primary source. When a passage describes a market opportunity, technology, or initiative that Dennis has created or is driving, treat that as evidence of his business impact and explain it clearly. Only use the phrase "The portfolio documents do not contain information about that" if the retrieved passages are entirely unrelated to the question — not simply because the phrasing differs from the question. Synthesize and interpret what is present rather than refusing to engage.`
-    ),
+    new SystemMessage(QA_SYSTEM_PROMPT),
     ...historyMessages,
     new HumanMessage(
       `Portfolio passages (your ONLY source of truth):\n\n${context}\n\n---\nQuestion: ${question}`
@@ -514,4 +519,56 @@ Use the retrieved passages as your primary source. When a passage describes a ma
     tokensInput: hydeIn + answerUsage.input,
     tokensOutput: hydeOut + answerUsage.output,
   };
+}
+
+// ---------------------------------------------------------------------------
+// Streaming Q&A — same retrieval pipeline, streams the final LLM response
+// ---------------------------------------------------------------------------
+export async function* streamAnswer(
+  question: string,
+  conversationHistory: Array<{ role: "user" | "assistant"; content: string }>
+): AsyncGenerator<
+  { type: "chunk"; text: string } |
+  { type: "done"; sources: AnswerSource[]; tokensInput: number; tokensOutput: number }
+> {
+  const { passage: hypotheticalPassage, tokensInput: hydeIn, tokensOutput: hydeOut } =
+    await generateHypotheticalPassage(question);
+  const queryEmbedding = await generateEmbedding(hypotheticalPassage);
+
+  console.log(`[RAG stream] Q: "${question.substring(0, 80)}"`);
+
+  const { relevantChunks, sources } = await retrievePassages(question, queryEmbedding);
+
+  const context = relevantChunks.map((c, i) => `[Passage ${i + 1} — from ${c.fileName}]\n${c.content}`).join("\n\n");
+
+  const historyMessages = conversationHistory.map(m =>
+    m.role === "user" ? new HumanMessage(m.content) : new SystemMessage(m.content)
+  );
+
+  const messages = [
+    new SystemMessage(QA_SYSTEM_PROMPT),
+    ...historyMessages,
+    new HumanMessage(
+      `Portfolio passages (your ONLY source of truth):\n\n${context}\n\n---\nQuestion: ${question}`
+    ),
+  ];
+
+  const stream = await llm.stream(messages);
+  let tokensIn = hydeIn;
+  let tokensOut = hydeOut;
+  let lastChunk: any = null;
+
+  for await (const chunk of stream) {
+    lastChunk = chunk;
+    const text = typeof chunk.content === "string" ? chunk.content : "";
+    if (text) yield { type: "chunk", text };
+  }
+
+  if (lastChunk) {
+    const usage = extractUsage(lastChunk);
+    tokensIn += usage.input;
+    tokensOut += usage.output;
+  }
+
+  yield { type: "done", sources, tokensInput: tokensIn, tokensOutput: tokensOut };
 }

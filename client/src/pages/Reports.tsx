@@ -81,9 +81,9 @@ function StatCard({ label, value, sub, icon: Icon, color }: {
       <CardContent className="pt-5">
         <div className="flex items-start justify-between">
           <div>
-            <p className="text-sm text-slate-500">{label}</p>
-            <p className="text-2xl font-bold text-slate-900 mt-0.5">{value}</p>
-            {sub && <p className="text-xs text-slate-400 mt-0.5">{sub}</p>}
+            <p className="text-sm text-muted-foreground">{label}</p>
+            <p className="text-2xl font-bold text-foreground mt-0.5">{value}</p>
+            {sub && <p className="text-xs text-muted-foreground mt-0.5">{sub}</p>}
           </div>
           <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${color}`}>
             <Icon className="h-5 w-5" />
@@ -104,8 +104,8 @@ function ScoreBadge({ value }: { value: number }) {
 function SectionHeading({ title, sub }: { title: string; sub?: string }) {
   return (
     <div className="max-w-6xl mx-auto mb-4">
-      <h2 className="text-xl font-bold text-slate-900">{title}</h2>
-      {sub && <p className="text-sm text-slate-500">{sub}</p>}
+      <h2 className="text-xl font-bold text-foreground">{title}</h2>
+      {sub && <p className="text-sm text-muted-foreground">{sub}</p>}
     </div>
   );
 }
@@ -261,13 +261,13 @@ export default function Reports() {
   const isLoading = analysesLoading || statsLoading;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50">
+    <div className="min-h-screen bg-background">
       <main className="container mx-auto px-4 py-12">
 
         {/* ── Header ── */}
         <div className="text-center max-w-3xl mx-auto mb-12">
-          <h1 className="text-4xl font-bold text-slate-900 mb-4">Reporting & Analytics</h1>
-          <p className="text-xl text-slate-600">
+          <h1 className="text-4xl font-bold text-foreground mb-4">Reporting & Analytics</h1>
+          <p className="text-xl text-muted-foreground">
             Interactive job match reporting, knowledge base stats, and token usage — with CSV exports
             for Power BI integration.
           </p>
@@ -287,7 +287,7 @@ export default function Reports() {
               <CardTitle className="text-lg">In-App Recharts</CardTitle>
               <CardDescription>React-native interactive charts, zero extra dependencies</CardDescription>
             </CardHeader>
-            <CardContent className="text-sm text-slate-600 space-y-2">
+            <CardContent className="text-sm text-muted-foreground space-y-2">
               <p>Recharts v2.15.2 is already bundled — no additional licenses, external services, or API keys required.</p>
               <p>Filters update all charts instantly in the browser. Every chart supports tooltips, click-through navigation, and drill-down filtering.</p>
             </CardContent>
@@ -296,8 +296,8 @@ export default function Reports() {
           <Card className="hover:shadow-md hover:border-slate-300 transition-all">
             <CardHeader>
               <div className="flex items-center justify-between mb-2">
-                <div className="w-10 h-10 bg-slate-100 rounded-lg flex items-center justify-center">
-                  <CheckCircle2 className="h-5 w-5 text-slate-600" />
+                <div className="w-10 h-10 bg-muted rounded-lg flex items-center justify-center">
+                  <CheckCircle2 className="h-5 w-5 text-muted-foreground" />
                 </div>
                 <Badge variant="secondary">5 Options Evaluated</Badge>
               </div>
@@ -308,11 +308,11 @@ export default function Reports() {
               <table className="w-full text-xs">
                 <thead>
                   <tr className="border-b">
-                    <th className="text-left py-1 text-slate-500 font-medium">Option</th>
-                    <th className="text-left py-1 text-slate-500 font-medium">Blocker</th>
+                    <th className="text-left py-1 text-muted-foreground font-medium">Option</th>
+                    <th className="text-left py-1 text-muted-foreground font-medium">Blocker</th>
                   </tr>
                 </thead>
-                <tbody className="text-slate-600">
+                <tbody className="text-muted-foreground">
                   {[
                     ["Static Power BI PNG", "No interactivity"],
                     ["Power BI Embedded", "Azure AD + Pro license"],
@@ -345,11 +345,11 @@ export default function Reports() {
               <CardTitle className="text-lg">Migration Path to Power BI</CardTitle>
               <CardDescription>CSV exports → Power BI Desktop → Service</CardDescription>
             </CardHeader>
-            <CardContent className="text-sm text-slate-600 space-y-2">
+            <CardContent className="text-sm text-muted-foreground space-y-2">
               <p>
-                The two CSVs share an <code className="bg-slate-100 px-1 rounded text-xs">analysisId</code> key, forming a 1:many relational model that maps directly to Power BI tables.
+                The two CSVs share an <code className="bg-muted px-1 rounded text-xs">analysisId</code> key, forming a 1:many relational model that maps directly to Power BI tables.
               </p>
-              <p>Migration: export CSVs → Power BI Desktop → load both tables → set relationship on <code className="bg-slate-100 px-1 rounded text-xs">analysisId</code> → publish to Service.</p>
+              <p>Migration: export CSVs → Power BI Desktop → load both tables → set relationship on <code className="bg-muted px-1 rounded text-xs">analysisId</code> → publish to Service.</p>
             </CardContent>
           </Card>
         </div>
@@ -420,7 +420,7 @@ export default function Reports() {
               <Button variant="outline" onClick={() => { setDateFrom(""); setDateTo(""); setMinScore(0); setSelectedBucket(null); }}>
                 Reset All
               </Button>
-              <span className="text-sm text-slate-500 ml-auto self-end">
+              <span className="text-sm text-muted-foreground ml-auto self-end">
                 {filtered.length} of {analyses.length} analyses shown
               </span>
             </div>
@@ -428,7 +428,7 @@ export default function Reports() {
         </Card>
 
         {isLoading ? (
-          <div className="text-center text-slate-400 py-16">Loading analytics data…</div>
+          <div className="text-center text-muted-foreground py-16">Loading analytics data…</div>
         ) : (
           <>
             {/* ════════════════════════════════════════════
@@ -458,11 +458,11 @@ export default function Reports() {
                           if (!active || !payload?.length) return null;
                           const d = payload[0]?.payload;
                           return (
-                            <div className="bg-white border rounded shadow p-2 text-xs max-w-48">
+                            <div className="bg-card border rounded shadow p-2 text-xs max-w-48">
                               <p className="font-semibold truncate">{d?.jobTitle}</p>
-                              <p className="text-slate-400">{d?.date}</p>
+                              <p className="text-muted-foreground">{d?.date}</p>
                               <p className="text-blue-600 font-bold">{(d?.score ?? 0).toFixed(2)}% match</p>
-                              <p className="text-slate-400 mt-0.5">Click to open →</p>
+                              <p className="text-muted-foreground mt-0.5">Click to open →</p>
                             </div>
                           );
                         }}
@@ -566,7 +566,7 @@ export default function Reports() {
                 </CardHeader>
                 <CardContent>
                   {strengthsFreq.length === 0
-                    ? <p className="text-sm text-slate-400 py-8 text-center">No data</p>
+                    ? <p className="text-sm text-muted-foreground py-8 text-center">No data</p>
                     : (
                       <ResponsiveContainer width="100%" height={220}>
                         <BarChart data={strengthsFreq} layout="vertical" margin={{ top: 4, right: 16, bottom: 4, left: 0 }}>
@@ -588,7 +588,7 @@ export default function Reports() {
                 </CardHeader>
                 <CardContent>
                   {gapsFreq.length === 0
-                    ? <p className="text-sm text-slate-400 py-8 text-center">No data</p>
+                    ? <p className="text-sm text-muted-foreground py-8 text-center">No data</p>
                     : (
                       <ResponsiveContainer width="100%" height={220}>
                         <BarChart data={gapsFreq} layout="vertical" margin={{ top: 4, right: 16, bottom: 4, left: 0 }}>
@@ -680,7 +680,7 @@ export default function Reports() {
                 </CardHeader>
                 <CardContent>
                   {tokenLineData.length === 0
-                    ? <p className="text-sm text-slate-400 py-12 text-center">No token data yet — run a new analysis to start tracking.</p>
+                    ? <p className="text-sm text-muted-foreground py-12 text-center">No token data yet — run a new analysis to start tracking.</p>
                     : (
                       <ResponsiveContainer width="100%" height={280}>
                         <LineChart data={tokenLineData} margin={{ top: 4, right: 16, bottom: 4, left: -10 }}>
@@ -692,12 +692,12 @@ export default function Reports() {
                               if (!active || !payload?.length) return null;
                               const d = payload[0]?.payload;
                               return (
-                                <div className="bg-white border rounded shadow p-2 text-xs">
+                                <div className="bg-card border rounded shadow p-2 text-xs">
                                   <p className="font-semibold truncate max-w-36">{d?.jobTitle}</p>
-                                  <p className="text-slate-400">{d?.date}</p>
+                                  <p className="text-muted-foreground">{d?.date}</p>
                                   <p className="text-blue-600">In: {fmtK(d?.input ?? 0)}</p>
                                   <p className="text-purple-600">Out: {fmtK(d?.output ?? 0)}</p>
-                                  <p className="text-slate-600">Total: {fmtK(d?.total ?? 0)}</p>
+                                  <p className="text-muted-foreground">Total: {fmtK(d?.total ?? 0)}</p>
                                 </div>
                               );
                             }}
@@ -795,7 +795,7 @@ export default function Reports() {
                     <thead>
                       <tr className="border-b text-left">
                         {["Date", "Job Title", "Match", "Hard Skills", "Experience", "Domain", "Soft Skills", "Tokens"].map(h => (
-                          <th key={h} className="pb-2 pr-4 text-slate-500 font-medium whitespace-nowrap">{h}</th>
+                          <th key={h} className="pb-2 pr-4 text-muted-foreground font-medium whitespace-nowrap">{h}</th>
                         ))}
                       </tr>
                     </thead>
@@ -804,18 +804,18 @@ export default function Reports() {
                         <tr
                           key={a.id}
                           onClick={() => navigate(`/analysis/${a.id}`)}
-                          className="border-b hover:bg-slate-50 cursor-pointer transition-colors"
+                          className="border-b hover:bg-muted/50 cursor-pointer transition-colors"
                         >
-                          <td className="py-2 pr-4 text-slate-500 whitespace-nowrap">{toDate(a.createdAt).toLocaleDateString()}</td>
-                          <td className="py-2 pr-4 text-slate-900 font-medium max-w-48 truncate">
-                            {a.jobTitle ?? <span className="text-slate-400 italic">Untitled</span>}
+                          <td className="py-2 pr-4 text-muted-foreground whitespace-nowrap">{toDate(a.createdAt).toLocaleDateString()}</td>
+                          <td className="py-2 pr-4 text-foreground font-medium max-w-48 truncate">
+                            {a.jobTitle ?? <span className="text-muted-foreground italic">Untitled</span>}
                           </td>
                           <td className="py-2 pr-4"><ScoreBadge value={pct(a.matchScore)} /></td>
-                          <td className="py-2 pr-4 text-slate-600">{fmt2(pct(a.hardSkillsScore))}%</td>
-                          <td className="py-2 pr-4 text-slate-600">{fmt2(pct(a.experienceScore))}%</td>
-                          <td className="py-2 pr-4 text-slate-600">{fmt2(pct(a.domainScore))}%</td>
-                          <td className="py-2 pr-4 text-slate-600">{fmt2(pct(a.softSkillsScore))}%</td>
-                          <td className="py-2 text-slate-400 text-xs whitespace-nowrap">
+                          <td className="py-2 pr-4 text-muted-foreground">{fmt2(pct(a.hardSkillsScore))}%</td>
+                          <td className="py-2 pr-4 text-muted-foreground">{fmt2(pct(a.experienceScore))}%</td>
+                          <td className="py-2 pr-4 text-muted-foreground">{fmt2(pct(a.domainScore))}%</td>
+                          <td className="py-2 pr-4 text-muted-foreground">{fmt2(pct(a.softSkillsScore))}%</td>
+                          <td className="py-2 text-muted-foreground text-xs whitespace-nowrap">
                             {(a.tokensInput ?? 0) + (a.tokensOutput ?? 0) > 0
                               ? fmtK((a.tokensInput ?? 0) + (a.tokensOutput ?? 0))
                               : "—"}
@@ -825,7 +825,7 @@ export default function Reports() {
                     </tbody>
                   </table>
                   {filtered.length === 0 && (
-                    <p className="text-center text-slate-400 py-8">No analyses match the current filters.</p>
+                    <p className="text-center text-muted-foreground py-8">No analyses match the current filters.</p>
                   )}
                 </div>
               </CardContent>

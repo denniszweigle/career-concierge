@@ -51,7 +51,7 @@ export default function Chat() {
       setHistory([...nextHistory, { role: "assistant", content: answer, sources }]);
     } catch {
       toast.error("Failed to get answer");
-      setHistory(history); // roll back
+      setHistory(history);
     } finally {
       inputRef.current?.focus();
     }
@@ -60,20 +60,20 @@ export default function Chat() {
   const hasMessages = history.length > 0;
 
   return (
-    <div className="flex flex-col h-[calc(100vh-49px)] bg-gradient-to-br from-slate-50 to-slate-100">
+    <div className="flex flex-col h-[calc(100vh-49px)] bg-background">
 
       {/* Page header */}
-      <div className="bg-white border-b px-6 py-3 flex-shrink-0">
-        <h1 className="text-lg font-semibold text-slate-900">Portfolio Chat</h1>
-        <p className="text-xs text-slate-500">Ask anything about Dennis — answers grounded in indexed portfolio documents</p>
+      <div className="bg-card border-b px-6 py-3 flex-shrink-0">
+        <h1 className="text-lg font-semibold text-foreground">Portfolio Chat</h1>
+        <p className="text-xs text-muted-foreground">Ask anything about Dennis — answers grounded in indexed portfolio documents</p>
       </div>
 
       <div className="flex flex-1 overflow-hidden">
 
         {/* ── Left: Suggested prompts sidebar ─────────────────────────── */}
-        <aside className="w-72 flex-shrink-0 border-r bg-white flex flex-col overflow-y-auto">
+        <aside className="w-72 flex-shrink-0 border-r bg-card flex flex-col overflow-y-auto">
           <div className="px-4 py-3 border-b">
-            <div className="flex items-center gap-1.5 text-xs text-slate-500">
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
               <Sparkles className="h-3.5 w-3.5" />
               Suggested questions
             </div>
@@ -84,7 +84,7 @@ export default function Chat() {
                 key={prompt}
                 onClick={() => handleAsk(prompt)}
                 disabled={chatGeneral.isPending}
-                className="w-full text-left text-xs px-3 py-2.5 rounded-lg border border-slate-200 bg-slate-50 hover:bg-blue-50 hover:border-blue-200 hover:text-blue-700 transition-colors disabled:opacity-50 leading-snug"
+                className="w-full text-left text-xs px-3 py-2.5 rounded-lg border border-border bg-muted/50 hover:bg-blue-50 dark:hover:bg-blue-950 hover:border-blue-200 dark:hover:border-blue-800 hover:text-blue-700 dark:hover:text-blue-300 transition-colors disabled:opacity-50 leading-snug"
               >
                 {prompt}
               </button>
@@ -95,7 +95,7 @@ export default function Chat() {
             <div className="mt-auto px-3 pb-4">
               <button
                 onClick={() => setHistory([])}
-                className="w-full text-xs text-slate-400 hover:text-slate-600 py-2 border border-dashed border-slate-200 rounded-lg transition-colors"
+                className="w-full text-xs text-muted-foreground hover:text-foreground py-2 border border-dashed border-border rounded-lg transition-colors"
               >
                 Clear conversation
               </button>
@@ -109,10 +109,10 @@ export default function Chat() {
           {/* Messages */}
           <div className="flex-1 overflow-y-auto px-6 py-6 space-y-4">
             {!hasMessages && !chatGeneral.isPending && (
-              <div className="flex flex-col items-center justify-center h-full text-center text-slate-400 space-y-3">
-                <Bot className="h-12 w-12 text-slate-200" />
+              <div className="flex flex-col items-center justify-center h-full text-center text-muted-foreground space-y-3">
+                <Bot className="h-12 w-12 text-muted" />
                 <div>
-                  <p className="text-sm font-medium text-slate-500">Start a conversation</p>
+                  <p className="text-sm font-medium">Start a conversation</p>
                   <p className="text-xs mt-1">Select a prompt from the left or type your own question below.</p>
                 </div>
               </div>
@@ -124,11 +124,11 @@ export default function Chat() {
                   className={`max-w-[75%] rounded-2xl px-4 py-3 text-sm ${
                     msg.role === "user"
                       ? "bg-blue-600 text-white rounded-br-sm"
-                      : "bg-white border text-slate-900 rounded-bl-sm shadow-sm"
+                      : "bg-card border text-foreground rounded-bl-sm shadow-sm"
                   }`}
                 >
                   {msg.role === "assistant" ? (
-                    <div className="prose prose-sm prose-slate max-w-none">
+                    <div className="prose prose-sm prose-slate dark:prose-invert max-w-none">
                       <Streamdown>{msg.content}</Streamdown>
                     </div>
                   ) : (
@@ -136,10 +136,9 @@ export default function Chat() {
                   )}
                 </div>
 
-                {/* Source references */}
                 {msg.role === "assistant" && msg.sources && msg.sources.length > 0 && (
                   <div className="mt-2 max-w-[75%] space-y-1">
-                    <p className="text-xs text-slate-400 px-1">Sources</p>
+                    <p className="text-xs text-muted-foreground px-1">Sources</p>
                     <div className="flex flex-wrap gap-1.5">
                       {msg.sources.map(src => (
                         <a
@@ -148,11 +147,11 @@ export default function Chat() {
                           target="_blank"
                           rel="noopener noreferrer"
                           title={src.fileName}
-                          className="flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-slate-200 bg-white text-xs text-slate-600 hover:bg-blue-50 hover:border-blue-300 hover:text-blue-700 transition-colors max-w-[220px]"
+                          className="flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-border bg-card text-xs text-muted-foreground hover:bg-blue-50 dark:hover:bg-blue-950 hover:border-blue-300 hover:text-blue-700 dark:hover:text-blue-300 transition-colors max-w-[220px]"
                         >
                           <FileText className="h-3 w-3 flex-shrink-0" />
                           <span className="truncate">{src.fileName}</span>
-                          <span className="flex-shrink-0 text-slate-400">{src.similarity}%</span>
+                          <span className="flex-shrink-0 text-muted-foreground">{src.similarity}%</span>
                         </a>
                       ))}
                     </div>
@@ -163,8 +162,8 @@ export default function Chat() {
 
             {chatGeneral.isPending && (
               <div className="flex justify-start">
-                <div className="bg-white border rounded-2xl rounded-bl-sm px-4 py-3 shadow-sm">
-                  <Loader2 className="h-4 w-4 animate-spin text-slate-400" />
+                <div className="bg-card border rounded-2xl rounded-bl-sm px-4 py-3 shadow-sm">
+                  <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
                 </div>
               </div>
             )}
@@ -173,7 +172,7 @@ export default function Chat() {
           </div>
 
           {/* Input */}
-          <div className="flex-shrink-0 border-t bg-white px-6 py-4">
+          <div className="flex-shrink-0 border-t bg-card px-6 py-4">
             <div className="flex gap-3 max-w-3xl mx-auto">
               <Input
                 ref={inputRef}

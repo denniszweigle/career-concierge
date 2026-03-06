@@ -20,6 +20,8 @@ import {
   deleteDriveToken,
   upsertDocument,
   getDocuments,
+  getDocumentByDriveFileId,
+  deleteDocumentChunks,
   saveDocumentChunk,
   saveAnalysis,
   getAllAnalyses,
@@ -30,7 +32,7 @@ import {
 } from "./db";
 import { extractText, chunkText } from "./documentExtractor";
 import { generateEmbedding } from "./vectorEmbedding";
-import { matchJobDescription, answerQuestion } from "./matchingEngine";
+import { matchJobDescription, answerQuestion, clearChunkCache } from "./matchingEngine";
 import { syncStatus } from "./syncState";
 
 const PORTFOLIO_FOLDER_URL = process.env.GOOGLE_DRIVE_FOLDER_URL || "https://drive.google.com/drive/folders/1WKYLMDQv5c-EKrXQ-qMlFA7ltpkUUxls";
@@ -158,10 +160,12 @@ export const appRouter = router({
       console.log(`[syncDocuments] ${files.length} total files, ${extractableFiles.length} extractable (skipping ${files.length - extractableFiles.length} images/video/other)`);
 
       let processed = 0;
+      let skipped = 0;
       let failed = 0;
 
       syncStatus.isRunning = true;
       syncStatus.processed = 0;
+      syncStatus.skipped = 0;
       syncStatus.total = extractableFiles.length;
       syncStatus.currentFile = null;
       syncStatus.startedAt = new Date().toISOString();
@@ -171,7 +175,24 @@ export const appRouter = router({
         for (const file of extractableFiles) {
           try {
             syncStatus.currentFile = file.name;
-            syncStatus.processed = processed;
+
+            // Incremental sync: skip if file is unchanged
+            const existing = await getDocumentByDriveFileId(file.id);
+            const driveModified = new Date(file.modifiedTime ?? 0).getTime();
+            const dbModified = existing?.modifiedTime?.getTime() ?? 0;
+
+            if (existing?.isIndexed && driveModified === dbModified) {
+              skipped++;
+              syncStatus.skipped = skipped;
+              console.log(`[syncDocuments] ~ skipped (unchanged): ${file.name}`);
+              continue;
+            }
+
+            // File is new or changed — delete stale chunks before re-indexing
+            if (existing) {
+              await deleteDocumentChunks(existing.id);
+              console.log(`[syncDocuments] Deleted stale chunks for ${file.name}`);
+            }
 
             const fileType =
               file.mimeType.includes("pdf") ? "pdf" :
@@ -220,11 +241,13 @@ export const appRouter = router({
         syncStatus.isRunning = false;
         syncStatus.currentFile = null;
         syncStatus.finishedAt = new Date().toISOString();
+        clearChunkCache();
       }
 
       return {
         total: files.length,
         processed,
+        skipped,
         failed,
       };
     }),

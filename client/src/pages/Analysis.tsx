@@ -29,30 +29,74 @@ export default function Analysis() {
   // Sources are not stored in DB — track them client-side keyed by assistant message index
   const [sourcesMap, setSourcesMap] = useState<Record<number, { documentId: number; fileName: string; driveFileId: string; fileType: string; similarity: number }[]>>({});
 
+  const [isStreaming, setIsStreaming] = useState(false);
+  const [streamingText, setStreamingText] = useState("");
+
   const analysis = trpc.analysis.get.useQuery({ id: analysisId });
   const chatHistory = trpc.analysis.getChatHistory.useQuery({ analysisId });
-  const askQuestion = trpc.analysis.askQuestion.useMutation();
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [chatHistory.data]);
+  }, [chatHistory.data, streamingText]);
 
   const handleAskQuestion = async (q?: string) => {
     const text = (q ?? question).trim();
-    if (!text) return;
+    if (!text || isStreaming) return;
+
+    setQuestion("");
+    setIsStreaming(true);
+    setStreamingText("");
+
+    const prevAssistantCount = (chatHistory.data ?? []).filter(m => m.role === "assistant").length;
 
     try {
-      const result = await askQuestion.mutateAsync({ analysisId, question: text });
-      setQuestion("");
-      await chatHistory.refetch();
-      // Map sources to the new assistant message (last in refetched history)
-      if (result.sources && result.sources.length > 0) {
-        const assistantMsgs = (chatHistory.data ?? []).filter(m => m.role === "assistant");
-        const idx = assistantMsgs.length; // will be the new one after refetch
-        setSourcesMap(prev => ({ ...prev, [idx]: result.sources }));
+      const response = await fetch("/api/stream-answer", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ question: text, history: [], analysisId }),
+      });
+
+      if (!response.ok || !response.body) throw new Error("Stream failed");
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() ?? "";
+
+        for (const line of lines) {
+          if (!line.startsWith("data: ")) continue;
+          const payload = line.slice(6).trim();
+          if (!payload) continue;
+          try {
+            const data = JSON.parse(payload);
+            if (data.text) {
+              setStreamingText(prev => prev + data.text);
+            } else if (data.done) {
+              await chatHistory.refetch();
+              if (data.sources?.length > 0) {
+                setSourcesMap(prev => ({ ...prev, [prevAssistantCount]: data.sources }));
+              }
+              setStreamingText("");
+              setIsStreaming(false);
+            } else if (data.error) {
+              throw new Error("Stream error from server");
+            }
+          } catch {
+            // ignore parse errors on individual lines
+          }
+        }
       }
     } catch {
       toast.error("Failed to get answer");
+      setStreamingText("");
+      setIsStreaming(false);
     }
   };
 
@@ -86,29 +130,29 @@ export default function Analysis() {
   const hasChat = chatHistory.data && chatHistory.data.length > 0;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex flex-col">
+    <div className="min-h-screen bg-background flex flex-col">
       {/* Page title bar */}
-      <div className="bg-white border-b flex-shrink-0 px-4 py-3">
-        <h1 className="text-xl font-bold text-slate-900">
+      <div className="bg-card border-b flex-shrink-0 px-4 py-3">
+        <h1 className="text-xl font-bold text-foreground">
           {data.jobTitle || "Job Description Analysis"}
         </h1>
-        <p className="text-xs text-slate-500">Dennis "DZ" Zweigle's Portfolio Match Report</p>
+        <p className="text-xs text-muted-foreground">Dennis "DZ" Zweigle's Portfolio Match Report</p>
       </div>
 
       {/* Two-panel body */}
       <div className="flex flex-1 overflow-hidden">
 
         {/* ── Left: Chat Panel ─────────────────────────────────────────── */}
-        <aside className="w-80 xl:w-96 flex-shrink-0 border-r bg-white flex flex-col">
+        <aside className="w-80 xl:w-96 flex-shrink-0 border-r bg-card flex flex-col">
           <div className="px-4 py-3 border-b">
-            <h2 className="font-semibold text-slate-900 text-sm">Ask About Dennis</h2>
-            <p className="text-xs text-slate-500 mt-0.5">Answers grounded in indexed portfolio documents</p>
+            <h2 className="font-semibold text-foreground text-sm">Ask About Dennis</h2>
+            <p className="text-xs text-muted-foreground mt-0.5">Answers grounded in indexed portfolio documents</p>
           </div>
 
           {/* Suggested prompts */}
           {!hasChat && (
             <div className="px-3 py-3 border-b space-y-1.5">
-              <div className="flex items-center gap-1.5 text-xs text-slate-400 mb-2">
+              <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-2">
                 <Sparkles className="h-3 w-3" />
                 Suggested questions
               </div>
@@ -116,8 +160,8 @@ export default function Analysis() {
                 <button
                   key={prompt}
                   onClick={() => handleAskQuestion(prompt)}
-                  disabled={askQuestion.isPending}
-                  className="w-full text-left text-xs px-3 py-2 rounded-lg border border-slate-200 bg-slate-50 hover:bg-blue-50 hover:border-blue-200 hover:text-blue-700 transition-colors disabled:opacity-50"
+                  disabled={isStreaming}
+                  className="w-full text-left text-xs px-3 py-2 rounded-lg border border-border bg-muted/50 hover:bg-blue-50 dark:hover:bg-blue-950 hover:border-blue-200 dark:hover:border-blue-800 hover:text-blue-700 dark:hover:text-blue-300 transition-colors disabled:opacity-50"
                 >
                   {prompt}
                 </button>
@@ -127,8 +171,8 @@ export default function Analysis() {
 
           {/* Chat history */}
           <div className="flex-1 overflow-y-auto px-3 py-3 space-y-3">
-            {!hasChat && !askQuestion.isPending && (
-              <p className="text-xs text-slate-400 text-center mt-8">
+            {!hasChat && !isStreaming && (
+              <p className="text-xs text-muted-foreground text-center mt-8">
                 Select a prompt above or type your own question below.
               </p>
             )}
@@ -145,7 +189,7 @@ export default function Analysis() {
                   className={`max-w-[90%] rounded-lg px-3 py-2 text-xs ${
                     msg.role === "user"
                       ? "bg-blue-600 text-white"
-                      : "bg-slate-100 text-slate-900 border"
+                      : "bg-muted text-foreground border"
                   }`}
                 >
                   {msg.role === "assistant" ? (
@@ -157,7 +201,7 @@ export default function Analysis() {
 
                 {sources && sources.length > 0 && (
                   <div className="mt-1.5 max-w-[90%] space-y-1">
-                    <p className="text-[10px] text-slate-400 px-0.5">Sources</p>
+                    <p className="text-[10px] text-muted-foreground px-0.5">Sources</p>
                     <div className="flex flex-wrap gap-1">
                       {sources.map(src => (
                         <a
@@ -166,11 +210,11 @@ export default function Analysis() {
                           target="_blank"
                           rel="noopener noreferrer"
                           title={src.fileName}
-                          className="flex items-center gap-1 px-2 py-0.5 rounded-full border border-slate-200 bg-white text-[10px] text-slate-600 hover:bg-blue-50 hover:border-blue-300 hover:text-blue-700 transition-colors max-w-[160px]"
+                          className="flex items-center gap-1 px-2 py-0.5 rounded-full border border-border bg-card text-[10px] text-muted-foreground hover:bg-blue-50 dark:hover:bg-blue-950 hover:border-blue-300 hover:text-blue-700 dark:hover:text-blue-300 transition-colors max-w-[160px]"
                         >
                           <FileText className="h-2.5 w-2.5 flex-shrink-0" />
                           <span className="truncate">{src.fileName}</span>
-                          <span className="flex-shrink-0 text-slate-400">{src.similarity}%</span>
+                          <span className="flex-shrink-0 text-muted-foreground">{src.similarity}%</span>
                         </a>
                       ))}
                     </div>
@@ -180,10 +224,12 @@ export default function Analysis() {
             );
             })}
 
-            {askQuestion.isPending && (
-              <div className="flex justify-start">
-                <div className="bg-slate-100 border rounded-lg px-3 py-2">
-                  <Loader2 className="h-3 w-3 animate-spin text-slate-400" />
+            {isStreaming && (
+              <div className="flex flex-col items-start">
+                <div className="max-w-[90%] rounded-lg px-3 py-2 text-xs bg-muted text-foreground border">
+                  {streamingText
+                    ? <Streamdown>{streamingText}</Streamdown>
+                    : <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />}
                 </div>
               </div>
             )}
@@ -194,7 +240,7 @@ export default function Analysis() {
           {/* Suggested prompts — shown inline after first message */}
           {hasChat && (
             <div className="px-3 py-2 border-t space-y-1">
-              <div className="flex items-center gap-1.5 text-xs text-slate-400 mb-1">
+              <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-1">
                 <Sparkles className="h-3 w-3" />
                 Quick prompts
               </div>
@@ -203,8 +249,8 @@ export default function Analysis() {
                   <button
                     key={prompt}
                     onClick={() => handleAskQuestion(prompt)}
-                    disabled={askQuestion.isPending}
-                    className="text-xs px-2 py-1 rounded-full border border-slate-200 bg-slate-50 hover:bg-blue-50 hover:border-blue-200 hover:text-blue-700 transition-colors disabled:opacity-50"
+                    disabled={isStreaming}
+                    className="text-xs px-2 py-1 rounded-full border border-border bg-muted/50 hover:bg-blue-50 dark:hover:bg-blue-950 hover:border-blue-200 dark:hover:border-blue-800 hover:text-blue-700 dark:hover:text-blue-300 transition-colors disabled:opacity-50"
                   >
                     {prompt.length > 40 ? prompt.slice(0, 38) + "…" : prompt}
                   </button>
@@ -220,15 +266,15 @@ export default function Analysis() {
               value={question}
               onChange={e => setQuestion(e.target.value)}
               onKeyDown={e => e.key === "Enter" && handleAskQuestion()}
-              disabled={askQuestion.isPending}
+              disabled={isStreaming}
               className="text-xs"
             />
             <Button
               size="icon"
               onClick={() => handleAskQuestion()}
-              disabled={askQuestion.isPending || !question.trim()}
+              disabled={isStreaming || !question.trim()}
             >
-              {askQuestion.isPending ? (
+              {isStreaming ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
               ) : (
                 <Send className="h-4 w-4" />
@@ -279,30 +325,30 @@ export default function Analysis() {
               <CardContent>
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                   <div>
-                    <div className="text-sm text-slate-600 mb-1">Hard Skills (40%)</div>
-                    <div className="text-2xl font-bold text-slate-900">{data.hardSkillsScore?.toFixed(1)}%</div>
-                    <div className="w-full bg-slate-200 rounded-full h-2 mt-2">
+                    <div className="text-sm text-muted-foreground mb-1">Hard Skills (40%)</div>
+                    <div className="text-2xl font-bold text-foreground">{data.hardSkillsScore?.toFixed(1)}%</div>
+                    <div className="w-full bg-border rounded-full h-2 mt-2">
                       <div className="bg-blue-600 h-2 rounded-full" style={{ width: `${data.hardSkillsScore}%` }} />
                     </div>
                   </div>
                   <div>
-                    <div className="text-sm text-slate-600 mb-1">Experience (30%)</div>
-                    <div className="text-2xl font-bold text-slate-900">{data.experienceScore?.toFixed(1)}%</div>
-                    <div className="w-full bg-slate-200 rounded-full h-2 mt-2">
+                    <div className="text-sm text-muted-foreground mb-1">Experience (30%)</div>
+                    <div className="text-2xl font-bold text-foreground">{data.experienceScore?.toFixed(1)}%</div>
+                    <div className="w-full bg-border rounded-full h-2 mt-2">
                       <div className="bg-purple-600 h-2 rounded-full" style={{ width: `${data.experienceScore}%` }} />
                     </div>
                   </div>
                   <div>
-                    <div className="text-sm text-slate-600 mb-1">Domain (20%)</div>
-                    <div className="text-2xl font-bold text-slate-900">{data.domainScore?.toFixed(1)}%</div>
-                    <div className="w-full bg-slate-200 rounded-full h-2 mt-2">
+                    <div className="text-sm text-muted-foreground mb-1">Domain (20%)</div>
+                    <div className="text-2xl font-bold text-foreground">{data.domainScore?.toFixed(1)}%</div>
+                    <div className="w-full bg-border rounded-full h-2 mt-2">
                       <div className="bg-indigo-600 h-2 rounded-full" style={{ width: `${data.domainScore}%` }} />
                     </div>
                   </div>
                   <div>
-                    <div className="text-sm text-slate-600 mb-1">Soft Skills (10%)</div>
-                    <div className="text-2xl font-bold text-slate-900">{data.softSkillsScore?.toFixed(1)}%</div>
-                    <div className="w-full bg-slate-200 rounded-full h-2 mt-2">
+                    <div className="text-sm text-muted-foreground mb-1">Soft Skills (10%)</div>
+                    <div className="text-2xl font-bold text-foreground">{data.softSkillsScore?.toFixed(1)}%</div>
+                    <div className="w-full bg-border rounded-full h-2 mt-2">
                       <div className="bg-teal-600 h-2 rounded-full" style={{ width: `${data.softSkillsScore}%` }} />
                     </div>
                   </div>
@@ -325,12 +371,12 @@ export default function Analysis() {
                           <div className="flex-shrink-0 w-6 h-6 rounded-full bg-green-100 text-green-700 flex items-center justify-center text-sm font-bold">
                             {idx + 1}
                           </div>
-                          <div className="text-sm text-slate-700">{strength}</div>
+                          <div className="text-sm text-muted-foreground">{strength}</div>
                         </li>
                       ))}
                     </ul>
                   ) : (
-                    <div className="text-sm text-slate-600">No strengths identified</div>
+                    <div className="text-sm text-muted-foreground">No strengths identified</div>
                   )}
                 </CardContent>
               </Card>
@@ -348,12 +394,12 @@ export default function Analysis() {
                           <div className="flex-shrink-0 w-6 h-6 rounded-full bg-orange-100 text-orange-700 flex items-center justify-center text-sm font-bold">
                             {idx + 1}
                           </div>
-                          <div className="text-sm text-slate-700">{gap}</div>
+                          <div className="text-sm text-muted-foreground">{gap}</div>
                         </li>
                       ))}
                     </ul>
                   ) : (
-                    <div className="text-sm text-slate-600">No gaps identified</div>
+                    <div className="text-sm text-muted-foreground">No gaps identified</div>
                   )}
                 </CardContent>
               </Card>
@@ -366,7 +412,7 @@ export default function Analysis() {
                 <CardDescription>Professional assessment by High-Precision Executive Recruiter</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="prose prose-slate max-w-none">
+                <div className="prose prose-slate dark:prose-invert max-w-none">
                   <Streamdown>{data.detailedReport || "No detailed report available"}</Streamdown>
                 </div>
               </CardContent>

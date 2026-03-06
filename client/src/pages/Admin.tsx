@@ -74,11 +74,11 @@ export default function Admin() {
 
   if (!isAuthenticated) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50">
+      <div className="min-h-screen flex items-center justify-center bg-background">
         <Card className="w-full max-w-md">
           <CardHeader className="text-center">
-            <div className="mx-auto w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center mb-2">
-              <Lock className="h-6 w-6 text-slate-500" />
+            <div className="mx-auto w-12 h-12 bg-muted rounded-full flex items-center justify-center mb-2">
+              <Lock className="h-6 w-6 text-muted-foreground" />
             </div>
             <CardTitle>Admin Access Required</CardTitle>
             <CardDescription>Sign in to manage the portfolio and Google Drive connection</CardDescription>
@@ -106,10 +106,10 @@ export default function Admin() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
+    <div className="min-h-screen bg-background">
       <div className="container mx-auto px-4 py-4">
-        <h1 className="text-2xl font-bold text-slate-900">Admin</h1>
-        <p className="text-sm text-slate-600">Portfolio & Google Drive Management</p>
+        <h1 className="text-2xl font-bold text-foreground">Admin</h1>
+        <p className="text-sm text-muted-foreground">Portfolio & Google Drive Management</p>
       </div>
 
       <main className="container mx-auto px-4 py-8">
@@ -131,7 +131,7 @@ export default function Admin() {
                   <span className="font-medium">Connected</span>
                 </div>
               ) : (
-                <div className="flex items-center gap-2 text-slate-600">
+                <div className="flex items-center gap-2 text-muted-foreground">
                   <XCircle className="h-5 w-5" />
                   <span>Not connected</span>
                 </div>
@@ -201,13 +201,13 @@ export default function Admin() {
                 </div>
               ) : (
                 <div className="space-y-2">
-                  <div className="text-3xl font-bold text-slate-900">{documents.data?.length || 0}</div>
-                  <div className="text-sm text-slate-600">documents indexed</div>
+                  <div className="text-3xl font-bold text-foreground">{documents.data?.length || 0}</div>
+                  <div className="text-sm text-muted-foreground">documents indexed</div>
                   {documents.data && documents.data.length > 0 && (
                     <div className="mt-4 space-y-1">
                       {documents.data.map(doc => (
                         <div key={doc.id} className="flex items-center gap-2 text-sm">
-                          <FileText className="h-4 w-4 text-slate-400" />
+                          <FileText className="h-4 w-4 text-muted-foreground" />
                           <span className="truncate">{doc.fileName}</span>
                         </div>
                       ))}
@@ -235,19 +235,19 @@ export default function Admin() {
                     <a
                       key={analysis.id}
                       href={`/analysis/${analysis.id}`}
-                      className="block w-full text-left p-3 rounded-lg border hover:bg-slate-50 transition-colors"
+                      className="block w-full text-left p-3 rounded-lg border hover:bg-accent transition-colors"
                     >
                       <div className="font-medium text-sm truncate">
                         {analysis.jobTitle || "Untitled Analysis"}
                       </div>
-                      <div className="text-xs text-slate-600 mt-1">
+                      <div className="text-xs text-muted-foreground mt-1">
                         Match: {analysis.matchScore?.toFixed(1)}%
                       </div>
                     </a>
                   ))}
                 </div>
               ) : (
-                <div className="text-sm text-slate-600 text-center py-8">No analyses yet</div>
+                <div className="text-sm text-muted-foreground text-center py-8">No analyses yet</div>
               )}
             </CardContent>
           </Card>
