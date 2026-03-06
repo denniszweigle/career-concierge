@@ -13,9 +13,18 @@ import { ENV } from "./_core/env";
  * Never registered in production (NODE_ENV === "production").
  */
 export function registerDevLogin(app: Express) {
-  if (ENV.isProduction) return;
+  const bootstrapSecret = process.env.DEV_LOGIN_SECRET;
+  if (ENV.isProduction && !bootstrapSecret) return;
 
   app.get("/api/dev-login", async (req: Request, res: Response) => {
+    // In production, require ?secret=<DEV_LOGIN_SECRET>
+    if (ENV.isProduction) {
+      if (!bootstrapSecret || req.query.secret !== bootstrapSecret) {
+        res.status(403).send("Forbidden");
+        return;
+      }
+    }
+
     const openId = ENV.ownerOpenId || "local-dev-user";
     const name = "Dev Admin";
 
