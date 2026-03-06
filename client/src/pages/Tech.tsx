@@ -1,6 +1,6 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Brain, Database, FileCode2, Server, Shield, Layers, Wrench, Sparkles, Lightbulb, Code2, ShieldCheck, GitBranch } from "lucide-react";
+import { Brain, Database, FileCode2, Server, Shield, Layers, Wrench, Sparkles, Lightbulb, Code2, ShieldCheck, GitBranch, Cloud } from "lucide-react";
 
 type BusinessTool = {
   name: string;
@@ -306,6 +306,38 @@ const SECTIONS: TechSection[] = [
         version: "^2.1",
         why: "Fast unit and integration test runner compatible with Vite's module resolution. Tests live alongside source files (server/**/*.test.ts). Integration tests make real API calls and are run separately from unit tests.",
         link: "https://vitest.dev",
+      },
+    ],
+  },
+  {
+    title: "Infrastructure & Deployment",
+    description: "How the app is built, shipped, and hosted in production",
+    icon: Cloud,
+    color: "text-sky-600",
+    items: [
+      {
+        name: "Docker",
+        version: "Dockerfile · docker-compose.yml",
+        why: "The production app runs in a Docker container — Node.js server + SQLite volume mount. Containerization ensures the environment on Hetzner exactly matches what was tested locally. A single docker compose up --build deploys the full stack.",
+        link: "https://www.docker.com",
+      },
+      {
+        name: "Hetzner Cloud",
+        version: "VPS · CX22",
+        why: "Low-cost European VPS hosting. The app runs behind Caddy (reverse proxy with automatic HTTPS) on a single Hetzner instance. Chosen over AWS/GCP for simplicity and cost — a personal portfolio tool doesn't need managed cloud overhead.",
+        link: "https://www.hetzner.com",
+      },
+      {
+        name: "GitHub Actions CI/CD",
+        version: ".github/workflows/deploy.yml",
+        why: "Every push to main triggers an automated pipeline: TypeScript type-check → Vitest unit tests → SSH into the Hetzner server → git pull + docker compose rebuild. Zero-downtime deploys with automatic rollback on test failure. No manual SSH required after setup.",
+        link: "https://github.com/features/actions",
+      },
+      {
+        name: "GitHub",
+        version: "denniszweigle/career-concierge",
+        why: "Single source of truth for all code. The GitHub repo is the trigger for every deployment — a push to main is all that's needed to ship a change to production. Secrets (HETZNER_HOST, HETZNER_SSH_KEY) are stored in GitHub Actions secrets, never in code.",
+        link: "https://github.com/denniszweigle/career-concierge",
       },
     ],
   },
