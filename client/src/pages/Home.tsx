@@ -16,7 +16,7 @@ export default function Home() {
         <div className="text-center max-w-3xl mx-auto mb-12">
           <div className="flex justify-center mb-4">
             <img
-              src="/profile.jpg"
+              src="/profile2.jpg"
               alt="Dennis DZ Zweigle"
               width={80}
               height={80}
@@ -28,7 +28,7 @@ export default function Home() {
             Dennis DZ Zweigle Portfolio
           </h2>
           <p className="text-xl text-slate-600">
-          Welcome to a transparent look at my career. </br></br> This platform uses a 2 stagged RAG technology leveraging LangChain to analyze how my experience aligns with specific job roles. </br></br>From the Dockerized deployment to the GitHub Actions CI/CD, every line of code was directed and architected by me, using AI as a specialized tool to accelerate development. </br></br>Go ahead—ask the site anything about my tech capabilities or my process.
+          Welcome to a transparent look at my career. <br /><br /> This platform uses a 2 stagged RAG technology leveraging LangChain to analyze how my experience aligns with specific job roles. <br /><br />From the Dockerized deployment to the GitHub Actions CI/CD, every line of code was directed and architected by me, using AI as a specialized tool to accelerate development. <br /><br />Go ahead—ask the site anything about my tech capabilities or my process.
           </p>
           <ul className="text-xl text-slate-600 mt-4 space-y-2 text-left list-disc list-inside">
             <li>
