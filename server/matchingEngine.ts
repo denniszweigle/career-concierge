@@ -606,24 +606,70 @@ export async function* streamMatchJobDescription(
 }
 
 // ---------------------------------------------------------------------------
-// Streaming Q&A — same retrieval pipeline, streams the final LLM response
+// Streaming Q&A — direct cosine similarity (no HyDE, no re-ranker) for speed
 // ---------------------------------------------------------------------------
 export async function* streamAnswer(
   question: string,
   conversationHistory: Array<{ role: "user" | "assistant"; content: string }>
 ): AsyncGenerator<
-  { type: "chunk"; text: string } |
-  { type: "done"; sources: AnswerSource[]; tokensInput: number; tokensOutput: number }
+  | { type: "status"; message: string }
+  | { type: "chunk"; text: string }
+  | { type: "done"; sources: AnswerSource[]; tokensInput: number; tokensOutput: number }
 > {
-  const { passage: hypotheticalPassage, tokensInput: hydeIn, tokensOutput: hydeOut } =
-    await generateHypotheticalPassage(question);
-  const queryEmbedding = await generateEmbedding(hypotheticalPassage);
-
   console.log(`[RAG stream] Q: "${question.substring(0, 80)}"`);
 
-  const { relevantChunks, sources } = await retrievePassages(question, queryEmbedding);
+  yield { type: "status", message: "Embedding your question to prepare for semantic search..." };
+  const queryEmbedding = await generateEmbedding(question);
 
-  const context = relevantChunks.map((c, i) => `[Passage ${i + 1} — from ${c.fileName}]\n${c.content}`).join("\n\n");
+  const allChunks = await loadChunkCache();
+  yield { type: "status", message: `Scanning ${allChunks.length.toLocaleString()} portfolio passages for relevant content...` };
+
+  const candidates: RetrievalCandidate[] = [];
+  for (const c of allChunks) {
+    if (!c.embedding || !Array.isArray(c.embedding)) continue;
+    candidates.push({
+      content: c.content,
+      similarity: cosineSimilarity(queryEmbedding, c.embedding as number[]),
+      documentId: c.documentId,
+      fileName: c.fileName,
+      driveFileId: c.driveFileId,
+      fileType: c.fileType,
+    });
+  }
+
+  const listKeywords = /\b(all|every|list|enumerate|how many|count)\b/i;
+  const isListQuery = listKeywords.test(question);
+  const topK = isListQuery ? ENV.ragTopKQA * 4 : ENV.ragTopKQA;
+
+  const relevantChunks = candidates
+    .sort((a, b) => b.similarity - a.similarity)
+    .slice(0, topK);
+
+  // Deduplicate sources by documentId
+  const sourceMap = new Map<number, AnswerSource>();
+  for (const chunk of relevantChunks) {
+    const existing = sourceMap.get(chunk.documentId);
+    if (!existing || chunk.similarity > existing.similarity) {
+      sourceMap.set(chunk.documentId, {
+        documentId: chunk.documentId,
+        fileName: chunk.fileName,
+        driveFileId: chunk.driveFileId,
+        fileType: chunk.fileType,
+        similarity: Math.round(chunk.similarity * 100),
+      });
+    }
+  }
+  const sources = Array.from(sourceMap.values()).sort((a, b) => b.similarity - a.similarity);
+
+  const uniqueFiles = new Set(relevantChunks.map(c => c.fileName));
+  yield {
+    type: "status",
+    message: `Retrieved ${relevantChunks.length} passages from ${uniqueFiles.size} document${uniqueFiles.size !== 1 ? "s" : ""} — composing a grounded response...`,
+  };
+
+  const context = relevantChunks
+    .map((c, i) => `[Passage ${i + 1} — from ${c.fileName}]\n${c.content}`)
+    .join("\n\n");
 
   const historyMessages = conversationHistory.map(m =>
     m.role === "user" ? new HumanMessage(m.content) : new SystemMessage(m.content)
@@ -638,8 +684,8 @@ export async function* streamAnswer(
   ];
 
   const stream = await llm.stream(messages);
-  let tokensIn = hydeIn;
-  let tokensOut = hydeOut;
+  let tokensIn = 0;
+  let tokensOut = 0;
   let lastChunk: any = null;
 
   for await (const chunk of stream) {
@@ -650,8 +696,8 @@ export async function* streamAnswer(
 
   if (lastChunk) {
     const usage = extractUsage(lastChunk);
-    tokensIn += usage.input;
-    tokensOut += usage.output;
+    tokensIn = usage.input;
+    tokensOut = usage.output;
   }
 
   yield { type: "done", sources, tokensInput: tokensIn, tokensOutput: tokensOut };

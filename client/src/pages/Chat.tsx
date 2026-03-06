@@ -8,7 +8,13 @@ import { Streamdown } from "streamdown";
 type Source = { documentId: number; fileName: string; driveFileId: string; fileType: string; similarity: number };
 type Message = { role: "user" | "assistant"; content: string; sources?: Source[]; tokens?: { input: number; output: number } };
 
-const CHAT_ADJECTIVES = ["Thinking", "Searching", "Reasoning", "Analyzing", "Synthesizing", "Processing"];
+const CHAT_ADJECTIVES = [
+  "Thinking", "Reasoning", "Analyzing", "Reflecting", "Deliberating",
+  "Investigating", "Exploring", "Examining", "Evaluating", "Considering",
+  "Synthesizing", "Processing", "Contextualizing", "Cross-referencing",
+  "Searching", "Retrieving", "Scanning", "Filtering", "Ranking",
+  "Formulating", "Composing", "Grounding", "Interpreting", "Connecting",
+];
 
 function formatElapsed(s: number) {
   return s < 60 ? `${s}s` : `${Math.floor(s / 60)}m ${s % 60}s`;
@@ -32,6 +38,7 @@ export default function Chat() {
   const [question, setQuestion] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
   const [streamingText, setStreamingText] = useState("");
+  const [statusMessages, setStatusMessages] = useState<string[]>([]);
   const [adjIdx, setAdjIdx] = useState(0);
   const [elapsed, setElapsed] = useState(0);
   const startTimeRef = useRef<number | null>(null);
@@ -70,6 +77,7 @@ export default function Chat() {
     setQuestion("");
     setIsStreaming(true);
     setStreamingText("");
+    setStatusMessages([]);
 
     try {
       const response = await fetch("/api/stream-answer", {
@@ -102,7 +110,9 @@ export default function Chat() {
           if (!payload) continue;
           try {
             const data = JSON.parse(payload);
-            if (data.text) {
+            if (data.status) {
+              setStatusMessages(prev => [...prev, data.status]);
+            } else if (data.text) {
               accumulated += data.text;
               setStreamingText(accumulated);
             } else if (data.done) {
@@ -111,6 +121,7 @@ export default function Chat() {
                 : undefined;
               setHistory(prev => [...prev, { role: "assistant", content: accumulated, sources: data.sources ?? [], tokens }]);
               setStreamingText("");
+              setStatusMessages([]);
               setIsStreaming(false);
             } else if (data.error) {
               throw new Error("Stream error from server");
@@ -124,6 +135,7 @@ export default function Chat() {
       toast.error("Failed to get answer");
       setHistory(priorHistory);
       setStreamingText("");
+      setStatusMessages([]);
       setIsStreaming(false);
     } finally {
       inputRef.current?.focus();
@@ -252,10 +264,28 @@ export default function Chat() {
 
             {isStreaming && !streamingText && (
               <div className="flex justify-start">
-                <div className="bg-card border rounded-2xl rounded-bl-sm px-4 py-3 shadow-sm flex items-center gap-2.5">
-                  <Loader2 className="h-4 w-4 animate-spin text-muted-foreground flex-shrink-0" />
-                  <span className="text-sm font-semibold text-red-500">{CHAT_ADJECTIVES[adjIdx]}</span>
-                  <span className="text-xs text-muted-foreground">· {formatElapsed(elapsed)}</span>
+                <div className="bg-card border rounded-2xl rounded-bl-sm px-4 py-3 shadow-sm max-w-[80%] min-w-[220px]">
+                  {statusMessages.length > 0 ? (
+                    <div className="space-y-1.5">
+                      {statusMessages.slice(0, -1).map((msg, i) => (
+                        <div key={i} className="flex items-start gap-2 text-xs text-muted-foreground">
+                          <span className="text-green-500 mt-0.5 flex-shrink-0 leading-none">✓</span>
+                          <span>{msg}</span>
+                        </div>
+                      ))}
+                      <div className="flex items-start gap-2 text-xs">
+                        <Loader2 className="h-3 w-3 animate-spin text-red-500 mt-0.5 flex-shrink-0" />
+                        <span className="text-foreground font-medium">{statusMessages[statusMessages.length - 1]}</span>
+                      </div>
+                      <p className="text-xs text-muted-foreground/50 text-right pt-0.5">{formatElapsed(elapsed)}</p>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2.5">
+                      <Loader2 className="h-4 w-4 animate-spin text-muted-foreground flex-shrink-0" />
+                      <span className="text-sm font-semibold text-red-500">{CHAT_ADJECTIVES[adjIdx]}</span>
+                      <span className="text-xs text-muted-foreground">· {formatElapsed(elapsed)}</span>
+                    </div>
+                  )}
                 </div>
               </div>
             )}

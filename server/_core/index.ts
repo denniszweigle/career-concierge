@@ -125,7 +125,9 @@ async function startServer() {
       }
 
       for await (const event of streamAnswer(question, resolvedHistory)) {
-        if (event.type === "chunk") {
+        if (event.type === "status") {
+          res.write(`data: ${JSON.stringify({ status: event.message })}\n\n`);
+        } else if (event.type === "chunk") {
           fullAnswer += event.text;
           res.write(`data: ${JSON.stringify({ text: event.text })}\n\n`);
         } else {
