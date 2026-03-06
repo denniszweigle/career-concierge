@@ -11,6 +11,7 @@ export const llm = new ChatOpenAI({
   apiKey: ENV.forgeApiKey,
   maxTokens: ENV.llmMaxTokens,
   temperature: ENV.llmTemperature,
+  timeout: 60_000,
   configuration: { baseURL },
 });
 

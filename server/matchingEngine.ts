@@ -340,6 +340,8 @@ Report structure:
 // ---------------------------------------------------------------------------
 // Stage 2 — LLM re-ranker
 // ---------------------------------------------------------------------------
+const RERANK_TIMEOUT_MS = 12_000;
+
 async function rerankChunks<T extends { content: string; fileName: string }>(
   question: string,
   candidates: T[],
@@ -348,22 +350,34 @@ async function rerankChunks<T extends { content: string; fileName: string }>(
   if (candidates.length <= topN) return candidates;
 
   const numbered = candidates
-    .map((c, i) => `[${i + 1}] (${c.fileName}): ${c.content.substring(0, 300)}`)
+    .map((c, i) => `[${i + 1}] (${c.fileName}): ${c.content.substring(0, 150)}`)
     .join("\n\n");
 
   const structured = llm.withStructuredOutput(rerankSchema);
+  const timeoutPromise = new Promise<null>(resolve =>
+    setTimeout(() => resolve(null), RERANK_TIMEOUT_MS)
+  );
+
   try {
-    const result = await structured.invoke([
-      new SystemMessage(
-        `You are a relevance judge for a career portfolio Q&A system. ` +
-        `Select the ${topN} passage IDs most directly useful for answering the question. ` +
-        `Prefer passages with specific facts, dollar amounts, percentages, named projects, ` +
-        `technologies, and measurable achievements. Return IDs ordered most to least relevant.`
-      ),
-      new HumanMessage(
-        `Question: "${question}"\n\nPassages:\n${numbered}\n\nReturn the ${topN} most relevant passage IDs.`
-      ),
+    const result = await Promise.race([
+      structured.invoke([
+        new SystemMessage(
+          `You are a relevance judge for a career portfolio Q&A system. ` +
+          `Select the ${topN} passage IDs most directly useful for answering the question. ` +
+          `Prefer passages with specific facts, dollar amounts, percentages, named projects, ` +
+          `technologies, and measurable achievements. Return IDs ordered most to least relevant.`
+        ),
+        new HumanMessage(
+          `Question: "${question}"\n\nPassages:\n${numbered}\n\nReturn the ${topN} most relevant passage IDs.`
+        ),
+      ]),
+      timeoutPromise,
     ]);
+
+    if (!result) {
+      console.log("[RAG] Re-ranker timed out, falling back to embedding order");
+      return candidates.slice(0, topN);
+    }
 
     const selected = result.selectedIds
       .filter((id) => id >= 1 && id <= candidates.length)
