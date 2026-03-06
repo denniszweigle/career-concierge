@@ -207,6 +207,224 @@ To add secrets:
 
 ---
 
+## Problem 5 — `git pull` Fails in CI: "could not read Username"
+
+### Symptom
+```
+fatal: could not read Username for 'https://github.com': No such device or address
+```
+
+### Why It Happened
+The repo was cloned over HTTPS without credentials stored. When GitHub Actions SSHes into the server and runs `git pull`, there is no interactive terminal to prompt for a username/password — the command just fails.
+
+### How It Was Resolved
+Embed a GitHub Personal Access Token directly in the remote URL on the server:
+
+```bash
+# Run on the server as deploy user
+cd ~/career-concierge
+git remote set-url origin https://YOUR_TOKEN@github.com/denniszweigle/career-concierge.git
+```
+
+**To generate the token:**
+- GitHub → Settings → Developer settings → Personal access tokens → Tokens (classic)
+- Note: `hetzner-deploy`, Expiration: No expiration, Scope: `repo`
+- Copy the token immediately — GitHub only shows it once
+
+**Security note:** The token is stored in plaintext in `.git/config` on the server. Since the server is only accessible via SSH key and the deploy user has no sudo access, this is acceptable. Rotate the token periodically as a best practice.
+
+---
+
+## Problem 6 — App Container Crashes: "Cannot find package 'vite'"
+
+### Symptom
+```
+Error [ERR_MODULE_NOT_FOUND]: Cannot find package 'vite' imported from /app/dist/index.js
+```
+or
+```
+Error [ERR_MODULE_NOT_FOUND]: Cannot find package '@builder.io/vite-plugin-jsx-loc' imported from /app/dist/index.js
+```
+
+### Why It Happened
+The backend is bundled with esbuild using `--packages=external`, which leaves all `import` statements as live runtime references instead of bundling them. `server/_core/vite.ts` had a static top-level import:
+```ts
+import { createServer as createViteServer } from "vite";
+import viteConfig from "../../vite.config";
+```
+Even though `setupVite()` is only called in development, these imports exist at the top of the file. Since esbuild marks them as external (not bundled), Node.js tries to resolve them at startup — but `vite` and `@builder.io/vite-plugin-jsx-loc` are devDependencies not installed in the production Docker image.
+
+### How It Was Resolved
+Two changes to `server/_core/vite.ts`:
+
+1. Moved the `vite` import inside the `setupVite` function as a dynamic import
+2. Removed the import of `vite.config` entirely — Vite auto-discovers its config file when `configFile` is not explicitly set to `false`
+
+```ts
+export async function setupVite(app: Express, server: Server) {
+  const { createServer: createViteServer } = await import("vite");
+
+  const vite = await createViteServer({
+    server: { middlewareMode: true, hmr: { server }, allowedHosts: true as const },
+    appType: "custom",
+  });
+  // ...
+}
+```
+
+This way the `vite` import is never evaluated in production (since `setupVite` is never called when `NODE_ENV !== 'development'`), and `vite.config.ts` is never bundled into the server output.
+
+---
+
+## Problem 7 — Caddyfile on Server Not Updated After Git Push
+
+### Symptom
+Caddy logs show it's still trying to obtain a TLS certificate for `yourdomain.com` after the Caddyfile was updated in git.
+
+### Why It Happened
+The Caddyfile on the server was already showing `yourdomain.com` when the repo was first cloned. Even after updating the Caddyfile in git and pushing, `docker compose restart caddy` does not force Caddy to re-read the config file if the file on disk was never updated.
+
+### How It Was Resolved
+Manually verified the file on the server, found it still had the old content, then reloaded:
+```bash
+# Verify what's on the server
+cat ~/career-concierge/Caddyfile
+
+# Reload Caddy with the corrected config
+docker compose restart caddy
+
+# Confirm TLS certificate was issued
+docker compose logs --tail=30 caddy
+# Look for: "certificate obtained successfully"
+```
+
+---
+
+## Problem 8 — Q&A Failing: Wrong Default LLM Model + LangSmith 403
+
+### Symptom
+```
+[tRPC error] analysis.chatGeneral: 404 The model `gemini-2.5-flash` does not exist or you do not have access to it.
+```
+Then after fixing the model:
+```
+Failed to Failed to send multipart request. Received status [403]: Forbidden.
+[tRPC error] analysis.chatGeneral: Connection error.
+```
+
+### Why It Happened
+Two separate issues:
+
+1. **Wrong default model**: `server/_core/env.ts` had `llmModel: process.env.LLM_MODEL ?? "gemini-2.5-flash"` — a Gemini model that doesn't exist on the OpenAI API endpoint.
+
+2. **LangSmith API key invalid**: The production `.env` had a truncated/invalid `LANGCHAIN_API_KEY`. When LangSmith tracing is enabled and the key is invalid, LangChain throws a 403 error that propagates and kills the entire LLM call. Setting `LANGCHAIN_TRACING_V2=false` alone is not enough — LangChain auto-enables tracing when `LANGCHAIN_API_KEY` is present regardless of the flag.
+
+### How It Was Resolved
+
+**Fix 1** — Changed the default model in `server/_core/env.ts`:
+```ts
+llmModel: process.env.LLM_MODEL ?? "gpt-4o-mini",
+```
+
+**Fix 2** — Removed all LangSmith env vars from production `.env`:
+```bash
+# Remove these lines from ~/career-concierge/.env:
+# LANGCHAIN_TRACING_V2=...
+# LANGCHAIN_API_KEY=...
+# LANGCHAIN_PROJECT=...
+```
+Then forced a full container restart (not just `restart`):
+```bash
+docker compose down && docker compose up -d
+```
+
+**Key lesson**: `docker compose restart` does NOT reliably flush env var changes. Always use `docker compose down && docker compose up -d` after changing `.env`.
+
+---
+
+## Problem 9 — OpenAI API Calls Failing: "getaddrinfo EAI_AGAIN v1"
+
+### Symptom
+```
+cause: Error: getaddrinfo EAI_AGAIN v1
+  hostname: 'v1'
+```
+The app is trying to resolve `v1` as a DNS hostname instead of hitting `https://api.openai.com/v1`.
+
+### Why It Happened
+The production `.env` had two entries for `BUILT_IN_FORGE_API_URL` — the second one was corrupt (`https:/` only, missing `//api.openai.com`). The second entry overrides the first. The code constructs the base URL as:
+```ts
+`${ENV.forgeApiUrl.replace(/\/$/, "")}/v1`
+```
+With `https:/` as the value, this produces `https://v1` and the OpenAI client resolves `v1` as the hostname.
+
+### How It Was Resolved
+```bash
+# Check for duplicate entries
+cat -A ~/career-concierge/.env | grep BUILT_IN_FORGE_API_URL
+# Shows two lines — delete the corrupt second one
+
+# Verify container sees the correct value
+docker compose exec app sh -c 'echo "URL=$BUILT_IN_FORGE_API_URL"'
+# Should output: URL=https://api.openai.com
+
+# Full restart required to pick up env changes
+docker compose down && docker compose up -d
+```
+
+---
+
+## Problem 10 — Cannot Log In to Admin on Production
+
+### Symptom
+Clicking Sign In on `https://baeb90.com` returns:
+```json
+{"error":"code and state are required"}
+```
+The Admin page is not accessible.
+
+### Why It Happened
+In production, `NODE_ENV=production` disables the `/api/dev-login` shortcut. Manus OAuth (`OAUTH_SERVER_URL`) is also not configured. There is no login path.
+
+### How It Was Resolved
+Added a secret-protected bootstrap login endpoint to `server/devLogin.ts`. When `DEV_LOGIN_SECRET` is set in the environment, `/api/dev-login?secret=<value>` works even in production:
+
+```bash
+# Add to production .env
+echo 'DEV_LOGIN_SECRET=your-secret-here' >> ~/career-concierge/.env
+
+docker compose down && docker compose up -d
+
+# Then visit in browser:
+# https://baeb90.com/api/dev-login?secret=your-secret-here
+```
+
+The endpoint creates the admin user (using `OWNER_OPEN_ID`) and sets a session cookie, then redirects to `/admin`.
+
+---
+
+## Problem 11 — Google Drive Connect Fails: "redirect_uri_mismatch"
+
+### Symptom
+```
+Error 400: redirect_uri_mismatch
+```
+When clicking "Connect Google Drive" on the production admin page.
+
+### Why It Happened
+Google Cloud Console only had `http://localhost:3000/api/google-drive/callback` as an authorized redirect URI. The production callback URL `https://baeb90.com/api/google-drive/callback` was never added.
+
+### How It Was Resolved
+1. Google Cloud Console → project → **APIs & Services** → **Credentials**
+2. Click the OAuth 2.0 Client ID
+3. Under **Authorized redirect URIs**, add:
+   ```
+   https://baeb90.com/api/google-drive/callback
+   ```
+4. Save and retry connecting Google Drive
+
+---
+
 ## Key Files on the Server
 
 | Path | Purpose |
