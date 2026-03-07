@@ -29,18 +29,18 @@ export default function NavBar() {
   };
 
   return (
-    <nav className="bg-background border-b px-4 py-2 flex items-center justify-between sticky top-0 z-50">
+    <nav className="bg-background border-b px-4 py-2 flex items-center justify-between sticky top-0 z-50 gap-2">
       {/* Brand */}
       <button
         onClick={() => navigate("/")}
-        className="flex items-center gap-2 font-semibold text-foreground hover:text-blue-600 transition-colors"
+        className="flex items-center gap-2 font-semibold text-foreground hover:text-blue-600 transition-colors whitespace-nowrap flex-shrink-0"
       >
-        <BriefcaseBusiness className="h-5 w-5 text-blue-600" />
+        <BriefcaseBusiness className="h-5 w-5 text-blue-600 flex-shrink-0" />
         {siteName}
       </button>
 
       {/* Links */}
-      <div className="flex items-center gap-1">
+      <div className="flex items-center gap-1 overflow-x-auto flex-shrink min-w-0">
         {navLink("/", "Home", LayoutDashboard)}
         {navLink("/match", "Match", FileSearch)}
         {navLink("/chat", "Chat", MessageSquare)}

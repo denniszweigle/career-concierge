@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Loader2, Send, Sparkles, Bot, FileText } from "lucide-react";
+import { Loader2, Send, Sparkles, Bot, FileText, ChevronLeft, ChevronRight } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 import { toast } from "sonner";
 import { Streamdown } from "streamdown";
@@ -143,6 +143,7 @@ export default function Chat() {
   };
 
   const hasMessages = history.length > 0;
+  const [sidebarOpen, setSidebarOpen] = useState(true);
 
   return (
     <div className="flex flex-col h-[calc(100vh-49px)] bg-background">
@@ -156,37 +157,52 @@ export default function Chat() {
       <div className="flex flex-1 overflow-hidden">
 
         {/* ── Left: Suggested prompts sidebar ─────────────────────────── */}
-        <aside className="w-72 flex-shrink-0 border-r bg-card flex flex-col overflow-y-auto">
-          <div className="px-4 py-3 border-b">
-            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-              <Sparkles className="h-3.5 w-3.5" />
-              Suggested questions
+        {sidebarOpen && (
+          <aside className="w-72 flex-shrink-0 bg-card flex flex-col overflow-y-auto">
+            <div className="px-4 py-3 border-b">
+              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <Sparkles className="h-3.5 w-3.5" />
+                Suggested questions
+              </div>
             </div>
-          </div>
-          <div className="px-3 py-3 space-y-1.5">
-            {SUGGESTED_PROMPTS.map((prompt) => (
-              <button
-                key={prompt}
-                onClick={() => handleAsk(prompt)}
-                disabled={isStreaming}
-                className="w-full text-left text-xs px-3 py-2.5 rounded-lg border border-border bg-muted/50 hover:bg-blue-50 dark:hover:bg-blue-950 hover:border-blue-200 dark:hover:border-blue-800 hover:text-blue-700 dark:hover:text-blue-300 transition-colors disabled:opacity-50 leading-snug"
-              >
-                {prompt}
-              </button>
-            ))}
-          </div>
+            <div className="px-3 py-3 space-y-1.5">
+              {SUGGESTED_PROMPTS.map((prompt) => (
+                <button
+                  key={prompt}
+                  onClick={() => handleAsk(prompt)}
+                  disabled={isStreaming}
+                  className="w-full text-left text-xs px-3 py-2.5 rounded-lg border border-border bg-muted/50 hover:bg-blue-50 dark:hover:bg-blue-950 hover:border-blue-200 dark:hover:border-blue-800 hover:text-blue-700 dark:hover:text-blue-300 transition-colors disabled:opacity-50 leading-snug"
+                >
+                  {prompt}
+                </button>
+              ))}
+            </div>
 
-          {hasMessages && (
-            <div className="mt-auto px-3 pb-4">
-              <button
-                onClick={() => setHistory([])}
-                className="w-full text-xs text-muted-foreground hover:text-foreground py-2 border border-dashed border-border rounded-lg transition-colors"
-              >
-                Clear conversation
-              </button>
-            </div>
-          )}
-        </aside>
+            {hasMessages && (
+              <div className="mt-auto px-3 pb-4">
+                <button
+                  onClick={() => setHistory([])}
+                  className="w-full text-xs text-muted-foreground hover:text-foreground py-2 border border-dashed border-border rounded-lg transition-colors"
+                >
+                  Clear conversation
+                </button>
+              </div>
+            )}
+          </aside>
+        )}
+
+        {/* ── Vertical separator with toggle ───────────────────────────── */}
+        <div className="relative flex-shrink-0 w-px bg-border flex items-center justify-center">
+          <button
+            onClick={() => setSidebarOpen(o => !o)}
+            title={sidebarOpen ? "Hide suggestions" : "Show suggestions"}
+            className="absolute z-10 flex items-center justify-center w-5 h-10 rounded-full border border-border bg-background shadow-sm hover:bg-accent transition-colors"
+          >
+            {sidebarOpen
+              ? <ChevronLeft className="h-3 w-3 text-muted-foreground" />
+              : <ChevronRight className="h-3 w-3 text-muted-foreground" />}
+          </button>
+        </div>
 
         {/* ── Right: Chat area ─────────────────────────────────────────── */}
         <div className="flex-1 flex flex-col overflow-hidden">
