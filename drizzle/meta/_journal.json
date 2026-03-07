@@ -15,6 +15,13 @@
       "when": 1772656229268,
       "tag": "0001_spotty_shard",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1772904485642,
+      "tag": "0002_eminent_hitman",
+      "breakpoints": true
     }
   ]
 }

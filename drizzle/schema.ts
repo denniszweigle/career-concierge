@@ -49,6 +49,7 @@ export const documents = sqliteTable("documents", {
   modifiedTime: integer("modifiedTime", { mode: "timestamp" }),
   extractedText: text("extractedText"),
   isIndexed: integer("isIndexed", { mode: "boolean" }).notNull().default(false),
+  isPrimaryResume: integer("is_primary_resume", { mode: "boolean" }).default(false),
   createdAt: integer("createdAt", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
   updatedAt: integer("updatedAt", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()).$onUpdateFn(() => new Date()),
 });

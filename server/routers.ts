@@ -23,6 +23,8 @@ import {
   getDocuments,
   getDocumentByDriveFileId,
   deleteDocumentChunks,
+  deleteDocument,
+  setPrimaryResume,
   saveDocumentChunk,
   saveAnalysis,
   getAllAnalyses,
@@ -34,6 +36,7 @@ import {
 import { extractText, chunkText } from "./documentExtractor";
 import { generateEmbedding } from "./vectorEmbedding";
 import { matchJobDescription, answerQuestion, clearChunkCache } from "./matchingEngine";
+import { clearTailorPromptCache, readTailorPromptFile, writeTailorPromptFile } from "./tailorEngine";
 import { syncStatus } from "./syncState";
 
 const PORTFOLIO_FOLDER_URL = process.env.GOOGLE_DRIVE_FOLDER_URL || "https://drive.google.com/drive/folders/1WKYLMDQv5c-EKrXQ-qMlFA7ltpkUUxls";
@@ -262,6 +265,41 @@ export const appRouter = router({
     // Get current sync progress
     getSyncStatus: adminProcedure.query(() => {
       return syncStatus;
+    }),
+
+    // Delete one or more documents
+    deleteDocuments: adminProcedure
+      .input(z.object({ ids: z.array(z.number()).min(1) }))
+      .mutation(async ({ input }) => {
+        for (const id of input.ids) await deleteDocument(id);
+        return { deleted: input.ids.length };
+      }),
+
+    // Mark a document as the primary resume
+    setPrimaryResume: adminProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input }) => {
+        await setPrimaryResume(input.id);
+        return { success: true };
+      }),
+
+    // Get the current tailor system prompt file content
+    getTailorPrompt: adminProcedure.query(() => {
+      return { content: readTailorPromptFile() };
+    }),
+
+    // Save edited prompt content to file and clear cache
+    saveTailorPrompt: adminProcedure
+      .input(z.object({ content: z.string().min(1) }))
+      .mutation(({ input }) => {
+        writeTailorPromptFile(input.content);
+        return { success: true };
+      }),
+
+    // Reload the tailor system prompt from data/tailor-prompt.md
+    refreshTailorPrompt: adminProcedure.mutation(() => {
+      clearTailorPromptCache();
+      return { success: true };
     }),
   }),
 

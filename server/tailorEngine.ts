@@ -1,7 +1,44 @@
+import { readFileSync, writeFileSync } from "fs";
+import { join } from "path";
 import { SystemMessage, HumanMessage } from "@langchain/core/messages";
 import { llm } from "./_core/llm";
 import { generateEmbedding, cosineSimilarity } from "./vectorEmbedding";
 import { loadChunkCache } from "./matchingEngine";
+import { getPrimaryResume } from "./db";
+
+// ---------------------------------------------------------------------------
+// System prompt — loaded from data/tailor-prompt.md and cached in memory.
+// Edit that file, then click "Refresh Tailor Prompt" in Admin to reload.
+// ---------------------------------------------------------------------------
+const PROMPT_PATH = join(process.cwd(), "data", "tailor-prompt.md");
+let cachedSystemPrompt: string | null = null;
+
+function loadTailorPrompt(): string {
+  if (cachedSystemPrompt) return cachedSystemPrompt;
+  try {
+    cachedSystemPrompt = readFileSync(PROMPT_PATH, "utf-8").trim();
+    console.log(`[tailor] system prompt loaded from ${PROMPT_PATH} (${cachedSystemPrompt.length} chars)`);
+  } catch (err) {
+    console.error(`[tailor] failed to load prompt file at ${PROMPT_PATH} — using fallback`, err);
+    cachedSystemPrompt = "You are an expert Technical Career Strategist. Rewrite the resume and cover letter to match the job description. Output ### CUSTOM_RESUME then ### CUSTOM_COVER_LETTER.";
+  }
+  return cachedSystemPrompt;
+}
+
+export function clearTailorPromptCache(): void {
+  cachedSystemPrompt = null;
+  console.log("[tailor] system prompt cache cleared — will reload from file on next request");
+}
+
+export function readTailorPromptFile(): string {
+  return readFileSync(PROMPT_PATH, "utf-8");
+}
+
+export function writeTailorPromptFile(content: string): void {
+  writeFileSync(PROMPT_PATH, content, "utf-8");
+  cachedSystemPrompt = null;
+  console.log("[tailor] system prompt file updated and cache cleared");
+}
 
 // JD-aligned chunks: topical relevance to the specific role
 const TAILOR_TOP_K_JD = 20;
@@ -26,39 +63,6 @@ function extractUsage(response: { usage_metadata?: any; response_metadata?: any 
   return { input: u?.promptTokens ?? 0, output: u?.completionTokens ?? 0 };
 }
 
-// All factual anchors (role, company, metrics, certifications, years) come from the
-// retrieved passages injected into the human message — nothing is hardcoded here.
-const TAILOR_SYSTEM_PROMPT = `You are an expert Technical Career Strategist and ATS Optimization Engine.
-Rewrite the candidate's resume and cover letter to align with the provided Job Description.
-
-CRITICAL: Draw ALL factual content — current role, company name, metrics, certifications, years of experience — EXCLUSIVELY from the Career Overview Passages and Job-Relevant Passages provided in the user message. Do not invent, assume, or hallucinate any facts.
-
-OBJECTIVE: 95%+ keyword match to bypass ATS filters while maintaining 100% factual integrity.
-
-BRIDGE STRATEGY (critical):
-- If the JD requires a technology not present in the passages but an equivalent skill exists, bridge them explicitly.
-- Example: JD asks for AWS SageMaker → bridge with any equivalent cloud ML platform experience found in the passages
-- Example: JD asks for Azure DevOps → bridge with any CI/CD, infrastructure, or DevOps experience found in the passages
-
-RESUME INSTRUCTIONS:
-- Keyword Injection: Scrape JD for hard skills; integrate naturally into Professional Summary and Skills using exact JD terminology
-- Structural Integrity: Maintain chronological format; use the most recent role found in the Career Overview Passages as the top entry
-- Quantifiable Impact: Front-load all metrics found in the passages (time savings, dollar amounts, team sizes, percentages, etc.)
-- Tone: Professional, innovative, authoritative
-- ATS Format: Clean section headers, standard fonts, no tables/columns — maximize ATS parseability
-
-COVER LETTER INSTRUCTIONS:
-- Hook: Open with the candidate's unique value proposition using years of experience and AI specialization found in the passages
-- Pivot: Explicitly address the JD's primary pain point; highlight certifications and credentials found in the passages as trust signals
-- The "Why": Connect leadership experience, team sizes, and any startup/founding experience found in the passages to the company's growth needs
-- Tone: Confident, specific, compelling — not generic
-
-OUTPUT FORMAT (exact — output nothing before the first delimiter):
-### CUSTOM_RESUME
-[resume content — use ## for section headers, - for bullet points]
-
-### CUSTOM_COVER_LETTER
-[cover letter content — paragraphs only, no bullets]`;
 
 export type TailorEvent =
   | { type: "status"; message: string }
@@ -89,15 +93,25 @@ export async function* streamTailor(
 
   const validChunks = allChunks.filter(c => c.embedding && Array.isArray(c.embedding));
 
+  const primaryResume = await getPrimaryResume();
+  const resumeChunks = primaryResume
+    ? validChunks.filter(c => c.documentId === primaryResume.id)
+    : validChunks;
+
+  if (!primaryResume) {
+    console.warn("[tailor] No primary resume set — searching all documents");
+  }
+  console.log(`[tailor] using ${resumeChunks.length} chunks from ${primaryResume ? `"${primaryResume.fileName}"` : "all docs"}`);
+
   // JD-aligned retrieval
-  const jdChunks = validChunks
+  const jdChunks = resumeChunks
     .map(c => ({ content: c.content, similarity: cosineSimilarity(jdEmbedding, c.embedding as number[]) }))
     .sort((a, b) => b.similarity - a.similarity)
     .slice(0, TAILOR_TOP_K_JD);
 
   // Career overview retrieval — deduplicate against JD chunks
   const jdContentSet = new Set(jdChunks.map(c => c.content));
-  const overviewChunks = validChunks
+  const overviewChunks = resumeChunks
     .map(c => ({ content: c.content, similarity: cosineSimilarity(overviewEmbedding, c.embedding as number[]) }))
     .sort((a, b) => b.similarity - a.similarity)
     .filter(c => !jdContentSet.has(c.content))
@@ -107,6 +121,9 @@ export async function* streamTailor(
     `[tailor] JD chunks=${jdChunks.length} top-sim=${((jdChunks[0]?.similarity ?? 0) * 100).toFixed(1)}%`,
     `overview chunks=${overviewChunks.length}`
   );
+
+  // Full resume text in document order — used as the structural template
+  const resumeTemplate = resumeChunks.map(c => c.content).join("\n\n");
 
   const overviewContext = overviewChunks
     .map((c, i) => `[Overview ${i + 1}]\n${c.content}`)
@@ -118,10 +135,14 @@ export async function* streamTailor(
 
   yield { type: "status", message: "Generating tailored resume & cover letter..." };
 
+  const templateSection = primaryResume
+    ? `## Primary Resume (Structural Template)\n${resumeTemplate}\n\n---\n\n`
+    : "";
+
   const messages = [
-    new SystemMessage(TAILOR_SYSTEM_PROMPT),
+    new SystemMessage(loadTailorPrompt()),
     new HumanMessage(
-      `## Career Overview Passages\n${overviewContext}\n\n## Job-Relevant Passages\n${jdContext}\n\n---\nJob Title: ${jobTitle ?? "Not specified"}\n\nJob Description:\n${jobDescription}`
+      `${templateSection}## Career Overview Passages\n${overviewContext}\n\n## Job-Relevant Passages\n${jdContext}\n\n---\nJob Title: ${jobTitle ?? "Not specified"}\n\nJob Description:\n${jobDescription}`
     ),
   ];
 

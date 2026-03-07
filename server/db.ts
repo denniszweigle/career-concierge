@@ -188,6 +188,24 @@ export async function deleteDocumentChunks(documentId: number): Promise<void> {
   await db.delete(documentChunks).where(eq(documentChunks.documentId, documentId));
 }
 
+export async function deleteDocument(id: number): Promise<void> {
+  const db = getDb();
+  await deleteDocumentChunks(id);
+  await db.delete(documents).where(eq(documents.id, id));
+}
+
+export async function setPrimaryResume(id: number): Promise<void> {
+  const db = getDb();
+  await db.update(documents).set({ isPrimaryResume: false });
+  await db.update(documents).set({ isPrimaryResume: true }).where(eq(documents.id, id));
+}
+
+export async function getPrimaryResume(): Promise<Document | undefined> {
+  const db = getDb();
+  const result = await db.select().from(documents).where(eq(documents.isPrimaryResume, true)).limit(1);
+  return result[0];
+}
+
 export async function getDocumentChunks(documentId: number): Promise<DocumentChunk[]> {
   const db = getDb();
   return db
