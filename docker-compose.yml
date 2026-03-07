@@ -1,6 +1,6 @@
 services:
   app:
-    build: .
+    image: ghcr.io/denniszweigle/career-concierge:latest
     restart: unless-stopped
     env_file: .env
     environment:
