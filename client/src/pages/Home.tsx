@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { FileSearch, Brain, MessageSquare, ArrowRight, ChevronRight, Zap, GitBranch, Database, Box } from "lucide-react";
+import { useSiteName } from "@/hooks/useSiteName";
 
 const TYPING_PHRASES = [
   "Principal Engineer",
@@ -16,6 +17,7 @@ const TYPING_PHRASES = [
 
 export default function Home() {
   const [, navigate] = useLocation();
+  const siteName = useSiteName();
   const [phraseIndex, setPhraseIndex] = useState(0);
   const [displayed, setDisplayed] = useState("");
   const [typing, setTyping] = useState(true);
@@ -248,7 +250,7 @@ export default function Home() {
       {/* ── Footer ───────────────────────────────────────────────────────── */}
       <footer className="relative z-10 border-t border-white/[0.06] py-6">
         <div className="container mx-auto px-6 flex justify-between items-center">
-          <p className="text-xs text-slate-700">Personal Career Concierge · Dennis "DZ" Zweigle</p>
+          <p className="text-xs text-slate-700">{siteName} · Dennis "DZ" Zweigle</p>
           <a href="/admin" className="text-xs text-slate-700 hover:text-slate-400 transition-colors">
             Admin
           </a>

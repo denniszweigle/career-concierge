@@ -57,6 +57,23 @@ export default function Admin() {
     onError: () => toast.error("Failed to save tailor prompt"),
   });
 
+  const siteConfigQuery = trpc.system.getSiteConfig.useQuery(undefined, {
+    enabled: isAuthenticated,
+  });
+  const [siteNameDraft, setSiteNameDraft] = useState("");
+  useEffect(() => {
+    if (siteConfigQuery.data?.siteName !== undefined) {
+      setSiteNameDraft(siteConfigQuery.data.siteName);
+    }
+  }, [siteConfigQuery.data?.siteName]);
+  const saveSiteConfig = trpc.system.saveSiteConfig.useMutation({
+    onSuccess: () => {
+      toast.success("Site name saved");
+      siteConfigQuery.refetch();
+    },
+    onError: () => toast.error("Failed to save site name"),
+  });
+
   const syncStatusQuery = trpc.drive.getSyncStatus.useQuery(undefined, {
     enabled: isAuthenticated,
     refetchInterval: 5000,
@@ -440,6 +457,32 @@ export default function Admin() {
             </CardContent>
           </Card>
         </div>
+
+        {/* Site Name Editor */}
+        <Card className="mt-6">
+          <CardHeader>
+            <CardTitle>Site Name</CardTitle>
+            <CardDescription>Shown in the browser tab, nav bar, and page headers.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={siteNameDraft}
+                onChange={e => setSiteNameDraft(e.target.value)}
+                className="flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                placeholder="Agentic DZ"
+              />
+              <Button
+                onClick={() => saveSiteConfig.mutate({ siteName: siteNameDraft })}
+                disabled={saveSiteConfig.isPending || !siteNameDraft.trim()}
+              >
+                {saveSiteConfig.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Save
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Tailor Prompt Editor */}
         <Card className="mt-6">

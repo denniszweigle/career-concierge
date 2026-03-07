@@ -1,4 +1,5 @@
 import { useAuth } from "@/_core/hooks/useAuth";
+import { useSiteName } from "@/hooks/useSiteName";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
@@ -13,6 +14,7 @@ import { toast } from "sonner";
 
 export default function Dashboard() {
   const { user, loading, isAuthenticated } = useAuth();
+  const siteName = useSiteName();
   const [, navigate] = useLocation();
   const [jobTitle, setJobTitle] = useState("");
   const [jobDescription, setJobDescription] = useState("");
@@ -105,7 +107,7 @@ export default function Dashboard() {
       <header className="bg-white border-b">
         <div className="container mx-auto px-4 py-4 flex justify-between items-center">
           <div>
-            <h1 className="text-2xl font-bold text-slate-900">Personal Career Concierge</h1>
+            <h1 className="text-2xl font-bold text-slate-900">{siteName}</h1>
             <p className="text-sm text-slate-600">Dennis "DZ" Zweigle's Portfolio Analyzer</p>
           </div>
           <div className="flex items-center gap-4">

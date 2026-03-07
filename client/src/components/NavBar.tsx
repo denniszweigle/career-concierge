@@ -1,6 +1,7 @@
 import { useLocation } from "wouter";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { useTheme } from "@/contexts/ThemeContext";
+import { useSiteName } from "@/hooks/useSiteName";
 import { Button } from "@/components/ui/button";
 import { BriefcaseBusiness, LayoutDashboard, MessageSquare, Cpu, Settings, LogOut, LogIn, FileSearch, BarChart2, Sun, Moon } from "lucide-react";
 
@@ -8,6 +9,7 @@ export default function NavBar() {
   const [location, navigate] = useLocation();
   const { user, isAuthenticated, logout } = useAuth();
   const { theme, toggleTheme } = useTheme();
+  const siteName = useSiteName();
 
   const navLink = (path: string, label: string, Icon: React.ElementType) => {
     const active = location === path || (path !== "/" && location.startsWith(path));
@@ -34,7 +36,7 @@ export default function NavBar() {
         className="flex items-center gap-2 font-semibold text-foreground hover:text-blue-600 transition-colors"
       >
         <BriefcaseBusiness className="h-5 w-5 text-blue-600" />
-        Career Concierge
+        {siteName}
       </button>
 
       {/* Links */}
