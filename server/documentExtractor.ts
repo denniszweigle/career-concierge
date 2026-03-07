@@ -9,12 +9,21 @@ import { ENV } from './_core/env';
  * Extract text content from a PDF buffer using pdf-parse (pdf.js-based).
  */
 export async function extractPdfText(buffer: Buffer): Promise<string> {
+  // pdf-parse/PDF.js emits noisy "Ran out of space in font private use area" warnings
+  // for PDFs with complex custom fonts — suppress them, they don't affect extraction quality
+  const originalWarn = console.warn;
+  console.warn = (...args: unknown[]) => {
+    if (typeof args[0] === 'string' && args[0].includes('font private use area')) return;
+    originalWarn.apply(console, args);
+  };
   try {
     const data = await pdfParse(buffer);
     return data.text;
   } catch (error) {
     console.error('[PDF Extraction] Error:', error);
     throw new Error('Failed to extract text from PDF');
+  } finally {
+    console.warn = originalWarn;
   }
 }
 
