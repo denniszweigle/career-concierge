@@ -155,6 +155,11 @@ export async function upsertDocument(doc: InsertDocument): Promise<number> {
   }
 }
 
+export async function markDocumentIndexed(id: number): Promise<void> {
+  const db = getDb();
+  await db.update(documents).set({ isIndexed: true, updatedAt: new Date() }).where(eq(documents.id, id));
+}
+
 export async function getDocuments(): Promise<Document[]> {
   const db = getDb();
   return db.select().from(documents).orderBy(desc(documents.createdAt));

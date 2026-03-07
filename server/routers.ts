@@ -19,6 +19,7 @@ import {
   getDriveToken,
   deleteDriveToken,
   upsertDocument,
+  markDocumentIndexed,
   getDocuments,
   getDocumentByDriveFileId,
   deleteDocumentChunks,
@@ -228,6 +229,7 @@ export const appRouter = router({
                 embedding,
               });
             }
+            await markDocumentIndexed(documentId);
 
             processed++;
             syncStatus.processed = processed;
