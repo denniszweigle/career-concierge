@@ -69,7 +69,7 @@ export default function Admin() {
   const saveSiteConfig = trpc.system.saveSiteConfig.useMutation({
     onSuccess: () => {
       toast.success("Site name saved");
-      siteConfigQuery.refetch();
+      utils.system.getSiteConfig.invalidate();
     },
     onError: () => toast.error("Failed to save site name"),
   });
