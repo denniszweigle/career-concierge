@@ -28,9 +28,9 @@ const BUSINESS_TOOLS: BusinessTool[] = [
   {
     name: "Anthropic Claude Code",
     role: "Technical Implementation",
-    stat: "72 hrs",
+    stat: "144 hrs",
     description:
-      "Handled all technical details and code generation — from schema design and tRPC router definitions to the RAG matching engine, document extraction pipeline, Google Drive OAuth integration, and the full React frontend. Claude Code's deep codebase awareness and iterative refinement loop made it possible to build production-quality, type-safe TypeScript across a full-stack monorepo.",
+      "Handled all technical details and code generation — from schema design and tRPC router definitions to the 2-stage RAG matching engine, document extraction pipeline, Google Drive OAuth integration, and the full React frontend. Later sessions added the AI Resume & Cover Letter Tailor (dual RAG retrieval + streaming LLM + client-side jsPDF generation), incremental Drive sync, HyDE Q&A, LangSmith observability, and CI/CD automation. Claude Code's deep codebase awareness and iterative refinement loop made it possible to build production-quality, type-safe TypeScript across a full-stack monorepo without a single manual schema or type stub.",
     link: "https://claude.ai/code",
     icon: Code2,
     color: "text-violet-600",
@@ -249,6 +249,12 @@ const SECTIONS: TechSection[] = [
         why: "Consistent, tree-shakeable SVG icon set. Every icon in the app is from Lucide — a single icon family prevents visual inconsistency across pages.",
         link: "https://lucide.dev",
       },
+      {
+        name: "jsPDF",
+        version: "^4.2",
+        why: "Client-side PDF generation for the Resume & Cover Letter Tailor feature. Converts LLM output (section headers, bullets, body text) into ATS-friendly PDFs with selectable text, proper font sizing, and automatic page breaks — entirely in the browser with no server round-trip.",
+        link: "https://artskydj.github.io/jsPDF",
+      },
     ],
   },
   {
@@ -391,10 +397,10 @@ export default function Tech() {
             <div>
               <h2 className="text-xl font-bold text-foreground">RAG Pipeline Architecture</h2>
               <p className="text-sm text-muted-foreground">2-stage LangChain retrieval — how answers are grounded in portfolio documents</p>
-              <p className="text-sm text-muted-foreground">- Business ideation and website skeleton layout in Manus.AI in 8 hours</p>
-              <p className="text-sm text-muted-foreground">- technical implementation in 48 hours</p>
-              <p className="text-sm text-muted-foreground">- git pipeline 8 hours</p>
-              <p className="text-sm text-muted-foreground">- Push to production 8 hours</p>
+              <p className="text-sm text-muted-foreground">- Business ideation and website skeleton layout in Manus.AI: 8 hours</p>
+              <p className="text-sm text-muted-foreground">- Technical implementation (Claude Code): 120 hours</p>
+              <p className="text-sm text-muted-foreground">- Git pipeline &amp; CI/CD: 8 hours</p>
+              <p className="text-sm text-muted-foreground">- Push to production &amp; hardening: 8 hours</p>
             </div>
           </div>
 
