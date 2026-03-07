@@ -9,6 +9,7 @@ import { registerDevLogin } from "../devLogin";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { streamAnswer, streamMatchJobDescription } from "../matchingEngine";
+import { streamTailor } from "../tailorEngine";
 import { saveChatMessage, getChatMessages, saveAnalysis } from "../db";
 import { serveStatic, setupVite } from "./vite";
 
@@ -174,6 +175,41 @@ async function startServer() {
       sse({ error: true });
     }
     clearTimeout(requestTimeout);
+    if (!res.writableEnded) res.end();
+  });
+
+  // Streaming resume + cover letter tailor — SSE endpoint, no DB save
+  app.post("/api/stream-tailor", async (req, res) => {
+    const { jobTitle, jobDescription } = req.body as {
+      jobTitle?: string;
+      jobDescription: string;
+    };
+
+    if (!jobDescription || typeof jobDescription !== "string") {
+      res.status(400).json({ error: "jobDescription required" });
+      return;
+    }
+
+    res.setHeader("Content-Type", "text/event-stream");
+    res.setHeader("Cache-Control", "no-cache");
+    res.setHeader("Connection", "keep-alive");
+    res.setHeader("X-Accel-Buffering", "no");
+
+    const sse = (payload: object) => {
+      if (!res.writableEnded) {
+        res.write(`data: ${JSON.stringify(payload)}\n\n`);
+        (res as any).flush?.();
+      }
+    };
+
+    try {
+      for await (const event of streamTailor(jobDescription, jobTitle)) {
+        sse(event);
+      }
+    } catch (err) {
+      console.error("[stream-tailor] Error:", err);
+      sse({ type: "error", message: "Tailor failed" });
+    }
     if (!res.writableEnded) res.end();
   });
 

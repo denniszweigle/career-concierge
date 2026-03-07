@@ -54,7 +54,7 @@ export function clearChunkCache(): void {
   console.log("[RAG] Chunk cache cleared");
 }
 
-async function loadChunkCache(): Promise<CachedChunk[]> {
+export async function loadChunkCache(): Promise<CachedChunk[]> {
   if (chunkCache) return chunkCache;
 
   const chunks: CachedChunk[] = [];

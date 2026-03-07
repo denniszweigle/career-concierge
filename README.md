@@ -205,6 +205,14 @@ For full localhost auth setup details see [`docs/oauth_setup_instructions.md`](d
 5. LLM generates a narrative report with top strengths and gaps, grounded in the top 3 retrieved evidence passages per requirement
 6. Progress streamed as SSE events (`Extracting requirements` → `Searching portfolio` → `Scoring evidence` → `Generating report`) — client shows live stage name, cycling adjective, progress bar, and elapsed time
 
+**Resume & Cover Letter Tailor** (`POST /api/stream-tailor` SSE endpoint):
+1. Embeds the job description + title and runs a cosine similarity scan against the in-memory chunk cache
+2. Retrieves the top 30 most relevant portfolio passages as context
+3. Streams a full LLM generation with an ATS-optimization system prompt that keyword-injects JD requirements, maintains 7-year AI framing, and bridges equivalent technologies
+4. Client parses the output on `### CUSTOM_RESUME` / `### CUSTOM_COVER_LETTER` delimiters into two documents
+5. Rendered in a tabbed preview (Resume | Cover Letter) with **Download PDF** buttons; PDF is generated entirely client-side via `jsPDF` (selectable text, no server round-trip)
+6. No DB save — ephemeral output only
+
 **Portfolio Q&A** (`POST /api/stream-answer` SSE endpoint):
 1. Embeds the question directly and runs a cosine similarity scan against the in-memory chunk cache
 2. Top `RAG_TOP_K_QA` (default 8) passages retrieved; list queries ("list all patents", "how many...") automatically expand the pool
@@ -222,7 +230,8 @@ server/
   routers.ts     # All tRPC routers (auth, drive, analysis)
   db.ts          # All Drizzle CRUD — single source of truth for DB access
   devLogin.ts    # GET /api/dev-login — localhost-only session bootstrap
-  matchingEngine.ts    # Job matching, Chain of Density extraction, Q&A
+  matchingEngine.ts    # Job matching, Chain of Density extraction, Q&A, chunk cache
+  tailorEngine.ts      # Resume + cover letter tailor — RAG retrieval + streaming LLM generation
   vectorEmbedding.ts   # Embedding generation + in-memory cosine similarity search
   documentExtractor.ts # PDF/DOCX/PPTX/XLSX/TXT extraction + chunking
   googleDrive.ts       # Google Drive API wrapper
@@ -244,11 +253,83 @@ docs/
 - `stats.getPublicStats` — public
 - `POST /api/stream-match` — SSE endpoint; streams job match pipeline progress + final result
 - `POST /api/stream-answer` — SSE endpoint; streams Q&A answers token-by-token with token usage in done event
+- `POST /api/stream-tailor` — SSE endpoint; streams tailored resume + cover letter (no DB save)
 
 ### Path Aliases
 
 - `@/` → `client/src/`
 - `@shared/` → `shared/`
+
+---
+
+## Tailor Resume & Cover Letter
+
+### What it does
+
+The **Tailor Resume & Cover Letter** feature generates a fully ATS-optimized resume and cover letter for any job description in one click. It:
+
+- **Keyword-injects** hard skills scraped from the JD naturally into the Professional Summary and Skills sections
+- **Bridges equivalent technologies** — e.g., JD asks for AWS SageMaker → bridges with Google Cloud/Vertex AI MLOps experience
+- **Maintains factual integrity** — all content is grounded in indexed portfolio documents via RAG retrieval (top 30 chunks by cosine similarity)
+- **Frames 7 years of AI** — the hook emphasizes progressive AI architecture mastery from early ML pipelines to agentic RAG, not a longer career span
+- **Generates ATS-friendly PDFs** client-side via `jsPDF` (selectable text, standard fonts, clean headers, 20mm margins)
+
+### How to use
+
+1. Go to `/match`, paste a job title and description
+2. Click **Tailor Resume & Cover Letter**
+3. Watch status messages stream: Analyzing → Retrieving → Generating
+4. After ~30–60s, two tabs appear: **Resume** | **Cover Letter**
+5. Click **Download Resume PDF** or **Download Cover Letter PDF**
+
+No database entries are created — the output is ephemeral.
+
+### System prompt
+
+<details>
+<summary>View full ATS optimization prompt</summary>
+
+```
+You are an expert Technical Career Strategist and ATS Optimization Engine.
+Rewrite Dennis Zweigle's resume and cover letter to align with the provided Job Description.
+
+OBJECTIVE: 95%+ keyword match to bypass ATS filters while maintaining 100% factual integrity.
+
+BRIDGE STRATEGY (critical):
+- If JD requires a technology Dennis doesn't list but he has an equivalent skill, bridge them.
+- Example: JD asks for AWS SageMaker → "Architected enterprise-grade MLOps solutions (Google Cloud/Vertex AI), equivalent to AWS SageMaker environments"
+- Example: JD asks for Azure DevOps → highlight GitLab/GitHub CI/CD and Hetzner infrastructure as transferable DevOps expertise
+
+RESUME INSTRUCTIONS:
+- Keyword Injection: Scrape JD for hard skills; integrate naturally into Professional Summary and Skills
+- Structural Integrity: Maintain chronological format, starting with Sr. Staff AI & Data Solutions Architect at SWARM Tech AI
+- Quantifiable Impact: Front-load metrics (invoice creation 25 days → 2 days, $30M claims, etc.)
+- Tone: Professional, innovative, authoritative
+- ATS Format: Use clean section headers, standard fonts, no tables/columns — maximize ATS parseability
+
+COVER LETTER INSTRUCTIONS:
+- Hook: Open with Dennis's unique value proposition — 7 years of progressive AI architecture mastery, from early ML pipelines to cutting-edge agentic RAG systems
+- Pivot: Explicitly address the JD's primary pain point and highlight his AIGP (IAPP) certification and MIT AI Strategy background as trust signals
+- The "Why": Connect his founding of startups and leading teams of 10+ developers to the company's growth needs
+- Tone: Confident, specific, compelling — not generic
+
+OUTPUT FORMAT (exact):
+### CUSTOM_RESUME
+[resume content — ## for section headers, - for bullet points]
+
+### CUSTOM_COVER_LETTER
+[cover letter content — paragraphs only]
+```
+
+</details>
+
+### Codebase locations
+
+| File | Purpose |
+|---|---|
+| `server/tailorEngine.ts` | `streamTailor()` async generator — RAG retrieval + streaming LLM |
+| `server/_core/index.ts` | `POST /api/stream-tailor` SSE endpoint |
+| `client/src/pages/Match.tsx` | Tailor button, status UI, tab output, PDF download |
 
 ---
 
