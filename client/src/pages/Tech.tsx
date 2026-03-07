@@ -398,7 +398,7 @@ export default function Tech() {
               <h2 className="text-xl font-bold text-foreground">RAG Pipeline Architecture</h2>
               <p className="text-sm text-muted-foreground">2-stage LangChain retrieval — how answers are grounded in portfolio documents</p>
               <p className="text-sm text-muted-foreground">- Business ideation and website skeleton layout in Manus.AI: 8 hours</p>
-              <p className="text-sm text-muted-foreground">- Technical implementation (Claude Code): 120 hours</p>
+              <p className="text-sm text-muted-foreground">- Technical implementation (Claude Code): 144 hours</p>
               <p className="text-sm text-muted-foreground">- Git pipeline &amp; CI/CD: 8 hours</p>
               <p className="text-sm text-muted-foreground">- Push to production &amp; hardening: 8 hours</p>
             </div>
