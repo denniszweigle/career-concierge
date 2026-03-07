@@ -152,7 +152,7 @@ LLM_TEMPERATURE           # default: 0.1
 EMBEDDING_MODEL           # default: text-embedding-3-small
 CHUNK_SIZE                # default: 1000 (chars)
 CHUNK_OVERLAP             # default: 200 (chars)
-RAG_TOP_K_STAGE1          # default: 50 (Stage 1 cosine scan candidate pool)
+RAG_TOP_K_STAGE1          # default: 20 (Stage 1 cosine scan candidate pool)
 RAG_TOP_K_EVIDENCE        # default: 8 (Stage 2 re-ranker final passage count)
 RAG_STRENGTH_THRESHOLD    # default: 50 (0–100 score cutoff for strength vs gap)
 ```
@@ -191,11 +191,11 @@ For full localhost auth setup details see [`docs/oauth_setup_instructions.md`](d
 
 **Document Indexing** (`drive.syncDocuments` tRPC procedure):
 1. Lists files recursively from the configured Google Drive folder
-2. Filters to extractable MIME types (PDF/DOCX/PPTX/XLSX/TXT); skips unchanged files via `modifiedTime` comparison
+2. Filters to extractable MIME types (PDF/DOCX/PPTX/XLSX/TXT); skips files where `isIndexed=true` and `modifiedTime` is unchanged
 3. Deletes stale chunks before re-indexing changed files (no chunk duplication on repeat syncs)
 4. Extracts text from each file
 5. Chunks text and stores in `documents` + `documentChunks` SQLite tables
-6. Generates embeddings and stores as JSON arrays in SQLite; clears in-memory chunk cache after sync
+6. Generates embeddings, stores as JSON arrays in SQLite, then marks the document `isIndexed=true`; clears in-memory chunk cache after sync
 
 **Job Matching** (`POST /api/stream-match` SSE endpoint):
 1. Chain of Density extraction — four-pass LLM call extracts hard skills, experience, domain, and soft skill requirements from the JD
@@ -206,10 +206,9 @@ For full localhost auth setup details see [`docs/oauth_setup_instructions.md`](d
 6. Progress streamed as SSE events (`Extracting requirements` → `Searching portfolio` → `Scoring evidence` → `Generating report`) — client shows live stage name, cycling adjective, progress bar, and elapsed time
 
 **Portfolio Q&A** (`POST /api/stream-answer` SSE endpoint):
-1. HyDE — generates a hypothetical passage, embeds it for Stage 1 search
-2. Stage 1 — cosine scan against in-memory chunk cache; list queries ("list all patents", "how many...") automatically use `topK×4` and `stage1Pool×3`
-3. Stage 2 — LLM re-ranker selects final passages
-4. SSE streaming — answer streams token-by-token; client shows cycling adjective + elapsed time during retrieval, then renders text progressively; token usage (`in · out`) shown after completion
+1. Embeds the question directly and runs a cosine similarity scan against the in-memory chunk cache
+2. Top `RAG_TOP_K_QA` (default 8) passages retrieved; list queries ("list all patents", "how many...") automatically expand the pool
+3. SSE streaming — answer streams token-by-token; client shows cycling adjective + elapsed time during retrieval, then renders text progressively; token usage (`in · out`) shown after completion
 
 ### Directory Structure
 
