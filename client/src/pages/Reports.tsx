@@ -740,25 +740,25 @@ export default function Reports() {
                   </CardContent>
                 </Card>
 
-                <Card className="bg-amber-50 border-amber-200">
+                <Card className="bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-800">
                   <CardHeader>
-                    <CardTitle className="text-base text-amber-800">Estimated API Cost</CardTitle>
-                    <CardDescription className="text-amber-600">gpt-4o-mini: $0.15/1M input · $0.60/1M output</CardDescription>
+                    <CardTitle className="text-base text-amber-800 dark:text-amber-300">Estimated API Cost</CardTitle>
+                    <CardDescription className="text-amber-600 dark:text-amber-400">gpt-4o-mini: $0.15/1M input · $0.60/1M output</CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-1 text-sm">
                     <div className="flex justify-between">
-                      <span className="text-amber-700">Total input tokens</span>
-                      <span className="font-mono font-semibold text-amber-900">{fmtK(totalTokensInput)}</span>
+                      <span className="text-amber-700 dark:text-amber-400">Total input tokens</span>
+                      <span className="font-mono font-semibold text-amber-900 dark:text-amber-200">{fmtK(totalTokensInput)}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-amber-700">Total output tokens</span>
-                      <span className="font-mono font-semibold text-amber-900">{fmtK(totalTokensOutput)}</span>
+                      <span className="text-amber-700 dark:text-amber-400">Total output tokens</span>
+                      <span className="font-mono font-semibold text-amber-900 dark:text-amber-200">{fmtK(totalTokensOutput)}</span>
                     </div>
-                    <div className="flex justify-between border-t border-amber-200 pt-1 mt-1">
-                      <span className="text-amber-800 font-semibold">Estimated cost</span>
-                      <span className="font-mono font-bold text-amber-900">${estimatedCost}</span>
+                    <div className="flex justify-between border-t border-amber-200 dark:border-amber-700 pt-1 mt-1">
+                      <span className="text-amber-800 dark:text-amber-300 font-semibold">Estimated cost</span>
+                      <span className="font-mono font-bold text-amber-900 dark:text-amber-200">${estimatedCost}</span>
                     </div>
-                    <p className="text-xs text-amber-500 pt-1">Only tracks tokens from new analyses run after the token tracking update. Historical analyses show $0.</p>
+                    <p className="text-xs text-amber-500 dark:text-amber-500 pt-1">Only tracks tokens from new analyses run after the token tracking update. Historical analyses show $0.</p>
                   </CardContent>
                 </Card>
               </div>
