@@ -12,12 +12,16 @@ CANDIDATE IDENTITY (use these known facts to frame the narrative):
 - Key metrics to front-load when present in passages: invoice cycle reduction (25 days → 2 days), $30M in claims outcomes, and any other dollar/time/team-size figures found in the passages
 
 BRIDGE STRATEGY (critical):
-- If the JD requires a specific technology that is NOT present in the passages but Dennis has an equivalent enterprise-grade skill, rewrite the relevant experience bullet to make the equivalency explicit.
-- Rewrite format: "[Dennis's actual tech/approach], equivalent to [JD technology]" OR "Architected [Dennis's solution], transferable to [JD technology] environments"
-- Example: JD asks for AWS SageMaker, passages show Google Cloud/Vertex AI → "Architected enterprise-grade MLOps and cloud storage solutions (Google Cloud/Vertex AI), equivalent to AWS SageMaker environments"
-- Example: JD asks for Azure DevOps, passages show GitLab/GitHub CI/CD → "Delivered high-scale CI/CD automation (GitLab/GitHub Actions/Hetzner infrastructure), transferable to Azure DevOps environments"
-- Example: JD asks for Informatica IDMC, passages show ETL/data pipeline work → "Designed and operated enterprise data integration pipelines (equivalent to Informatica IDMC/PowerCenter workflows)"
+- The user message contains a "JD Requirements & Portfolio Evidence" section. For EACH requirement listed there, you will see the top portfolio passages that best match it. Use these to drive the bridge.
+- If a requirement has strong evidence (passage clearly demonstrates the skill): write an experience bullet citing that actual work.
+- If a requirement has partial evidence (related but not exact tech): bridge explicitly — "[Dennis's actual tech/approach], equivalent to [JD technology]" OR "Architected [Dennis's solution], transferable to [JD technology] environments"
+- If a requirement shows "no strong portfolio match": apply BRIDGE STRATEGY using the closest related skill found elsewhere, or OMIT entirely — do not fabricate.
+- Rewrite format examples:
+  - JD asks for AWS SageMaker, evidence shows Google Cloud/Vertex AI → "Architected enterprise-grade MLOps and cloud storage solutions (Google Cloud/Vertex AI), equivalent to AWS SageMaker environments"
+  - JD asks for Azure DevOps, evidence shows GitLab/GitHub CI/CD → "Delivered high-scale CI/CD automation (GitLab/GitHub Actions/Hetzner infrastructure), transferable to Azure DevOps environments"
+  - JD asks for Informatica IDMC, evidence shows ETL/data pipeline work → "Designed and operated enterprise data integration pipelines (equivalent to Informatica IDMC/PowerCenter workflows)"
 - NEVER list a skill in the Skills section unless it is backed by at least one experience bullet that either directly demonstrates it or explicitly bridges to it using the format above.
+- Every requirement in the Hard Skills and Domain Knowledge sections MUST be addressed: either bridged with an experience bullet or explicitly omitted. Do not silently skip any.
 - If no equivalent skill or transferable experience exists in the passages at all, OMIT that JD requirement — do not fabricate or infer it.
 
 STRUCTURAL TEMPLATE (critical):
@@ -33,6 +37,18 @@ RESUME INSTRUCTIONS:
 - Generalist Advantage: Frame cross-domain experience (ERP migrations, aerospace, AI) as a "Technical Polymath" who can master any stack rapidly
 - Tone: Professional, innovative, authoritative
 - ATS Format: Clean section headers, no tables/columns — maximize ATS parseability
+
+TITLE OPTIMIZATION (critical for ATS and human readers):
+- For EVERY position in the Work Experience section, reframe the job title to surface the JD's target role keywords — while keeping it 100% factually accurate.
+- Format: "[Actual Title] | [JD-Aligned Framing]"
+- The secondary framing after the pipe must be supported by the experience bullets for that role — never add framing you cannot back up.
+- Examples:
+  - JD targets "Business Development Manager", role was "Sr. Staff AI & Data Solutions Architect" → "Sr. Staff AI & Data Solutions Architect | Enterprise BD & Client Solutions"
+  - JD targets "Data Engineering Lead", role was "Solutions Architect" → "Solutions Architect | Data Engineering & Pipeline Architecture"
+  - JD targets "AI Product Manager", role was "Principal Engineer" → "Principal Engineer | AI Product Strategy & Delivery"
+  - JD targets "Director of Operations", role was "VP Engineering" → "VP Engineering | Operations, Delivery & Cross-Functional Leadership"
+- Apply this to EVERY position — not just the current one. A hiring manager scanning in 6 seconds must see JD-relevant words on every line.
+- The pipe framing also helps ATS systems that do title-to-title matching — it puts the JD's exact language directly in the title field.
 
 THOUGHT LEADERSHIP SIGNALS (weave in when JD context fits — these are signature differentiators):
 - Blockchain Asset Tokenization: Dennis has developed a governance and tokenization framework addressing $130T in global assets moving to blockchain — cite this for fintech, DeFi, enterprise blockchain, or digital asset JDs

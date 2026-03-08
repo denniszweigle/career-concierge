@@ -208,9 +208,12 @@ For full localhost auth setup details see [`docs/oauth_setup_instructions.md`](d
 6. Progress streamed as SSE events (`Extracting requirements` → `Searching portfolio` → `Scoring evidence` → `Generating report`) — client shows live stage name, cycling adjective, progress bar, and elapsed time
 
 **Resume & Cover Letter Tailor** (`POST /api/stream-tailor` SSE endpoint):
-1. Embeds the job description + title and runs a cosine similarity scan against the in-memory chunk cache
-2. Retrieves the top 30 most relevant portfolio passages as context
-3. Streams a full LLM generation with an ATS-optimization system prompt that keyword-injects JD requirements, maintains 7-year AI framing, and bridges equivalent technologies
+1. `extractJobRequirements()` — same structured LLM call as the match pipeline; extracts hardSkills, experienceRequirements, domainKnowledge, softSkills from the JD
+2. For each of the 4 requirement categories, embeds every requirement and retrieves top-K evidence passages from the **full 392-doc portfolio** (not just the resume) — so bridge strategy has real project-level proof
+3. Primary resume chunks retrieved separately as the ATS structural template
+4. Streams LLM generation with a structured prompt: template + per-category JD requirements + matched portfolio evidence
+5. Title Optimization: every Work Experience title rewritten as "[Actual Title] | [JD-Aligned Framing]" for ATS title-matching
+6. Bridge Strategy: each JD requirement explicitly bridged with evidence or omitted — never fabricated
 4. Client parses the output on `### CUSTOM_RESUME` / `### CUSTOM_COVER_LETTER` delimiters into two documents
 5. Rendered in a tabbed preview (Resume | Cover Letter) with **Download PDF** buttons; PDF is generated entirely client-side via `jsPDF` (selectable text, no server round-trip)
 6. No DB save — ephemeral output only
@@ -319,7 +322,10 @@ docs/
 
 The **Tailor Resume & Cover Letter** feature generates a fully ATS-optimized resume and cover letter for any job description in one click. It:
 
+- **Structured JD extraction** — same 4-category requirement extraction used by the match engine (hardSkills, experience, domain, softSkills), not a single blob embedding
+- **Full portfolio evidence retrieval** — for each requirement, searches all 392 indexed documents (not just the resume) to find the real project-level proof needed to back up each bridge
 - **Keyword-injects** hard skills scraped from the JD naturally into the Professional Summary and Skills sections
+- **Title Optimization** — every Work Experience title rewritten as `[Actual Title] | [JD-Aligned Framing]` so ATS title-matching and 6-second human scans both see the right keywords on every line
 - **Bridges equivalent technologies** — e.g., JD asks for AWS SageMaker → bridges with Google Cloud/Vertex AI MLOps experience
 - **Maintains factual integrity** — all content is grounded in indexed portfolio documents via RAG retrieval (top 30 chunks by cosine similarity)
 - **Frames 7 years of AI** — the hook emphasizes progressive AI architecture mastery from early ML pipelines to agentic RAG, not a longer career span
@@ -327,11 +333,17 @@ The **Tailor Resume & Cover Letter** feature generates a fully ATS-optimized res
 
 ### How to use
 
+**From the Match page:**
 1. Go to `/match`, paste a job title and description
 2. Click **Tailor Resume & Cover Letter**
-3. Watch status messages stream: Analyzing → Retrieving → Generating
+3. Watch status messages stream: Extracting requirements → Searching portfolio → Generating
 4. After ~30–60s, two tabs appear: **Resume** | **Cover Letter**
 5. Click **Download Resume PDF** or **Download Cover Letter PDF**
+
+**From an Analysis results page:**
+1. Run **Analyze Match** on any job description
+2. On the results page, click the prominent **Tailor Resume & Cover Letter** button (above the score cards, or in the top bar) — no re-pasting required, the JD is stored
+3. Tailored documents appear below the Detailed Report
 
 No database entries are created — the output is ephemeral.
 
@@ -341,7 +353,8 @@ The tailor system prompt lives in **`data/tailor-prompt.md`** — a plain text f
 
 Key sections in the prompt:
 - **CANDIDATE IDENTITY** — AIGP cert, MIT AI Strategy, SWARM Tech AI role, team size range, key metrics to front-load
-- **BRIDGE STRATEGY** — rules for bridging equivalent technologies when a JD skill isn't directly present (with examples)
+- **BRIDGE STRATEGY** — for each JD requirement, uses the retrieved portfolio evidence to bridge or explicitly omit; never fabricates; every Skills section entry must be backed by a body bullet
+- **TITLE OPTIMIZATION** — every Work Experience title rewritten as `[Actual Title] | [JD-Aligned Framing]` using the pipe format; applied to all positions, not just current role
 - **STRUCTURAL TEMPLATE** — instructs the LLM to mirror the ATS section order of the starred (primary) resume exactly
 - **THOUGHT LEADERSHIP SIGNALS** — signature differentiators to surface when JD context fits: blockchain asset tokenization ($130T addressable market), AI workforce displacement curriculum (1.5M pathway), open-source AI career platform vision, and the 6–7 year paradigm cadence
 - **RESUME INSTRUCTIONS** — keyword injection, chronological format, quantifiable impact front-loading
@@ -356,6 +369,7 @@ To edit: update `data/tailor-prompt.md` directly, then click **Refresh Prompt Ca
 | `server/tailorEngine.ts` | `streamTailor()` async generator — RAG retrieval + streaming LLM |
 | `server/_core/index.ts` | `POST /api/stream-tailor` SSE endpoint |
 | `client/src/pages/Match.tsx` | Tailor button, status UI, tab output, PDF download |
+| `client/src/pages/Analysis.tsx` | Tailor button in top bar + above score cards; inline output with PDF download |
 
 ---
 
