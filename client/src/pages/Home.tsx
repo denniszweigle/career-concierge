@@ -223,6 +223,63 @@ export default function Home() {
         </div>
       </section>
 
+      {/* ── How the AI works ─────────────────────────────────────────────── */}
+      <section className="relative z-10 border-t border-white/[0.06] py-14">
+        <div className="container mx-auto px-6 max-w-5xl">
+          <p className="text-center text-[11px] text-slate-600 uppercase tracking-widest mb-3">
+            AI Transparency
+          </p>
+          <h2 className="text-center text-2xl font-bold text-white mb-2">How this platform uses AI</h2>
+          <p className="text-center text-slate-500 text-sm mb-10 max-w-xl mx-auto">
+            Most AI career tools guess. This one retrieves — grounding every answer in indexed documents through a three-layer pipeline built to get past AI gatekeepers and surface the real story.
+          </p>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+            {/* Round 1 */}
+            <div className="rounded-xl bg-white/[0.03] border border-indigo-500/20 p-6 hover:bg-white/[0.05] transition-colors">
+              <div className="flex items-center gap-3 mb-4">
+                <span className="w-7 h-7 rounded-full bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center text-indigo-400 text-xs font-bold flex-shrink-0">1</span>
+                <h3 className="text-sm font-semibold text-white">HyDE — Smarter Semantic Search</h3>
+              </div>
+              <p className="text-xs text-slate-500 leading-relaxed">
+                Before searching the portfolio, the AI generates a <span className="text-slate-300">hypothetical answer passage</span> — a dense paragraph of what the right answer would look like. That passage is embedded and used for retrieval instead of the raw question. This bridges the vocabulary gap between how questions are asked and how career documents are written.
+              </p>
+              <div className="mt-4 rounded-lg bg-white/[0.04] border border-white/[0.07] px-3 py-2">
+                <p className="text-[11px] text-slate-600 italic">"Summarize leadership experience" → embeds a hypothetical resume passage → finds 1,300+ leadership chunks</p>
+              </div>
+            </div>
+
+            {/* Round 2 */}
+            <div className="rounded-xl bg-white/[0.03] border border-violet-500/20 p-6 hover:bg-white/[0.05] transition-colors">
+              <div className="flex items-center gap-3 mb-4">
+                <span className="w-7 h-7 rounded-full bg-violet-500/20 border border-violet-500/30 flex items-center justify-center text-violet-400 text-xs font-bold flex-shrink-0">2</span>
+                <h3 className="text-sm font-semibold text-white">Adaptive Retrieval Depth</h3>
+              </div>
+              <p className="text-xs text-slate-500 leading-relaxed">
+                Not every question needs the same number of document passages. The pipeline detects question intent — exploratory questions (<span className="text-slate-300">how is, applying, vision, strategy</span>) pull 3× more chunks; list queries pull 4×; focused questions use the baseline. More signal means more complete answers for complex multi-document topics.
+              </p>
+              <div className="mt-4 rounded-lg bg-white/[0.04] border border-white/[0.07] px-3 py-2">
+                <p className="text-[11px] text-slate-600 italic">"How is Governance applied to IoT?" → 24 passages retrieved across 45 files instead of 8</p>
+              </div>
+            </div>
+
+            {/* Round 3 */}
+            <div className="rounded-xl bg-white/[0.03] border border-blue-500/20 p-6 hover:bg-white/[0.05] transition-colors">
+              <div className="flex items-center gap-3 mb-4">
+                <span className="w-7 h-7 rounded-full bg-blue-500/20 border border-blue-500/30 flex items-center justify-center text-blue-400 text-xs font-bold flex-shrink-0">3</span>
+                <h3 className="text-sm font-semibold text-white">Portfolio Attribution Context</h3>
+              </div>
+              <p className="text-xs text-slate-500 leading-relaxed">
+                Constitutional frameworks, patent filings, and governance blueprints are formal documents — the author's name isn't in every sentence. The AI is explicitly told that <span className="text-slate-300">every retrieved passage belongs to the candidate's personal portfolio</span>: documents authored, patents filed, frameworks designed. Content is attributed correctly without hallucinating.
+              </p>
+              <div className="mt-4 rounded-lg bg-white/[0.04] border border-white/[0.07] px-3 py-2">
+                <p className="text-[11px] text-slate-600 italic">206 Governance+IoT chunks correctly attributed → rich, sourced answers instead of "no information found"</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* ── Tech credibility bar ─────────────────────────────────────────── */}
       <section className="relative z-10 border-t border-white/[0.06] py-10">
         <div className="container mx-auto px-6">
