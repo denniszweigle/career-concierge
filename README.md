@@ -222,6 +222,53 @@ For full localhost auth setup details see [`docs/oauth_setup_instructions.md`](d
 4. **Portfolio attribution** — the system prompt instructs the LLM that every retrieved passage is from the candidate's personal portfolio (documents authored, patents filed, frameworks designed) so content is correctly attributed even when the candidate's name doesn't appear in every sentence
 5. SSE streaming — answer streams token-by-token; client shows status messages during retrieval, then renders text progressively; token usage (`in · out`) shown after completion
 
+---
+
+## Portfolio Chat
+
+### What it does
+
+The **Portfolio Chat** page (`/chat`) is a conversational interface grounded exclusively in the candidate's indexed portfolio documents. It is designed to answer recruiter and hiring manager questions with cited, factual responses — no hallucination, no generic AI filler.
+
+### Suggested Questions
+
+The left sidebar displays 10 pre-built suggested prompts that demonstrate the depth of the portfolio. Each fires a full RAG query against all indexed documents:
+
+| Prompt | What it surfaces |
+|---|---|
+| What are your strongest technical skills? | Hard skills extracted across resume + project docs |
+| Summarize leadership and team management experience | Management history across all career documents |
+| What measurable business impact has been demonstrated? | Metrics: invoice cycle reduction, claims outcomes, team scale |
+| What does the portfolio reveal about leadership style? | Cross-document synthesis of management philosophy |
+| How does he handle cross-functional collaboration? | Evidence from project docs, plans, and career history |
+| Tell me about thoughts on Governance | Proof of Governance (PoG) framework — constitutions, whitepapers, investor docs |
+| How is Dennis applying Governance to IoT and Blockchain? | PoG + IoT integration — 206 indexed chunks across 45 files |
+| What are his most notable career achievements? | Top career milestones ranked by impact |
+| What industries has he worked across? | Cross-domain synthesis: Aerospace, ERP, Retail, AI, Blockchain, HR, FinTech |
+| What's the strongest case for hiring? | Full portfolio synthesis into a hiring narrative |
+
+### RAG Pipeline Enhancements (Chat-specific)
+
+Three rounds of improvements were made to ensure the Chat page finds and correctly answers questions about complex, multi-document topics:
+
+**Round 1 — HyDE added to streaming pipeline**
+The original `streamAnswer` function embedded the raw question directly. This caused vocabulary mismatch failures — a question like *"Summarize his leadership experience"* didn't semantically match resume phrases like *"Directed the migration of a CoE team"*. Fix: generate a hypothetical career passage first (same technique used in the non-streaming `answerQuestion`), embed that, then search. Recall improved dramatically for all broad/summary questions.
+
+**Round 2 — Broader topK trigger**
+The broad-query multiplier (3× chunks) originally only caught `summarize/describe/overview`. Questions like *"How is Dennis applying Governance to IoT?"* fell through to just 8 chunks. Fix: extended the regex to include `how is / how does / how did / what is / what are / applying / approach / vision / strategy` — any exploratory question now gets the expanded chunk pool.
+
+**Round 3 — Portfolio attribution in system prompt**
+The PoG Constitution, blockchain frameworks, and IoT governance documents are written as formal constitutional/legal documents — Dennis's name doesn't appear in every sentence. The LLM was seeing 206 relevant chunks but refusing to connect them to Dennis. Fix: the system prompt now explicitly states *"every retrieved passage is from the candidate's personal portfolio — documents he authored, patents he filed, frameworks he designed"* — so the LLM correctly attributes all content without hallucinating.
+
+### UI Features
+
+- **Collapsible sidebar** — suggested questions panel can be hidden/shown via a chevron toggle on the vertical separator, giving more space to the chat area
+- **Live status messages** — each retrieval stage emits a status event: embedding → scanning N passages → retrieved M passages from K documents → composing response
+- **Elapsed timer** — visible during retrieval and streaming so users know the system is working
+- **Source citations** — every assistant response includes clickable source chips showing the file name and similarity score, linked directly to the source document in Google Drive
+- **Token usage** — input and output token counts shown below each completed response
+- **Conversation history** — multi-turn context is passed with every request; a Clear conversation button resets the session
+
 ### Directory Structure
 
 ```
