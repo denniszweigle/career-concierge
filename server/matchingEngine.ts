@@ -489,7 +489,9 @@ const QA_SYSTEM_PROMPT = `You are a knowledgeable assistant answering questions 
 
 ${GROUNDING_DIRECTIVE}
 
-Use the retrieved passages as your primary source. When a passage describes a market opportunity, technology, or initiative that Dennis has created or is driving, treat that as evidence of his business impact and explain it clearly. Only use the phrase "The portfolio documents do not contain information about that" if the retrieved passages are entirely unrelated to the question — not simply because the phrasing differs from the question. Synthesize and interpret what is present rather than refusing to engage.`;
+IMPORTANT CONTEXT: Every retrieved passage comes from Dennis Zweigle's personal portfolio — documents he authored, patents he filed, business plans he created, constitutions and frameworks he designed, and work products from his career. When a passage describes a governance framework, blockchain system, IoT integration, AI strategy, or any technology initiative, treat it as Dennis's work and explain it as such — even if his name does not appear in every sentence of that passage.
+
+Synthesize and interpret what is present. When passages are topically relevant to the question, answer using them — do not refuse just because the exact phrasing of the question differs from the passage text. Only say "The portfolio documents do not contain information about that" if the retrieved passages are genuinely off-topic and unrelated to the question.`;
 
 // ---------------------------------------------------------------------------
 // Conversational Q&A — strictly grounded in retrieved portfolio chunks
@@ -648,8 +650,8 @@ export async function* streamAnswer(
     });
   }
 
-  // Broad queries (summaries, descriptions, overviews) span many documents — use more chunks
-  const broadKeywords = /\b(all|every|list|enumerate|how many|count|summarize|summary|describe|overview|explain|background|experience|history|tell me|what has|how has)\b/i;
+  // Broad queries span many documents — use more chunks for better coverage
+  const broadKeywords = /\b(all|every|list|enumerate|how many|count|summarize|summary|describe|overview|explain|background|experience|history|tell me|what has|how has|how is|how does|how did|what is|what are|what does|applying|applied|approach|thoughts|vision|strategy)\b/i;
   const isBroadQuery = broadKeywords.test(question);
   const topK = isBroadQuery ? ENV.ragTopKQA * 3 : ENV.ragTopKQA;
 

@@ -218,8 +218,9 @@ For full localhost auth setup details see [`docs/oauth_setup_instructions.md`](d
 **Portfolio Q&A** (`POST /api/stream-answer` SSE endpoint):
 1. **HyDE (Hypothetical Document Embedding)** — before searching, an LLM generates a dense hypothetical career passage that *would* answer the question; that passage is embedded instead of the raw question, dramatically improving recall for broad/summary queries where question vocabulary differs from document vocabulary
 2. Cosine similarity scan against the in-memory chunk cache using the HyDE embedding
-3. Top `RAG_TOP_K_QA` (default 8) passages retrieved; broad queries ("summarize", "describe", "overview", "experience") automatically expand to 3× the pool; list queries ("list all", "how many") expand to 4×
-4. SSE streaming — answer streams token-by-token; client shows status messages during retrieval, then renders text progressively; token usage (`in · out`) shown after completion
+3. Top `RAG_TOP_K_QA` (default 8) passages retrieved; broad queries ("summarize", "describe", "overview", "how is", "how does", "applying", "approach", "vision", "strategy") automatically expand to 3× the pool; list queries ("list all", "how many") expand to 4×
+4. **Portfolio attribution** — the system prompt instructs the LLM that every retrieved passage is from the candidate's personal portfolio (documents authored, patents filed, frameworks designed) so content is correctly attributed even when the candidate's name doesn't appear in every sentence
+5. SSE streaming — answer streams token-by-token; client shows status messages during retrieval, then renders text progressively; token usage (`in · out`) shown after completion
 
 ### Directory Structure
 
