@@ -606,7 +606,7 @@ export async function* streamMatchJobDescription(
 }
 
 // ---------------------------------------------------------------------------
-// Streaming Q&A — direct cosine similarity (no HyDE, no re-ranker) for speed
+// Streaming Q&A — HyDE + cosine similarity for accurate semantic retrieval
 // ---------------------------------------------------------------------------
 export async function* streamAnswer(
   question: string,
@@ -619,8 +619,16 @@ export async function* streamAnswer(
   const t0 = Date.now();
   console.log(`[RAG stream] Q: "${question.substring(0, 80)}"`);
 
+  // HyDE: generate a hypothetical career passage, then embed that instead of the raw question.
+  // This dramatically improves recall for broad/summary questions where the query vocabulary
+  // doesn't match the document vocabulary (e.g. "summarize leadership" vs "managed 15 engineers").
+  yield { type: "status", message: "Generating semantic search context for your question..." };
+  const { passage: hypotheticalPassage, tokensInput: hydeIn, tokensOutput: hydeOut } =
+    await generateHypotheticalPassage(question);
+  console.log(`[RAG stream] HyDE: "${hypotheticalPassage.substring(0, 120)}"`);
+
   yield { type: "status", message: "Embedding your question to prepare for semantic search..." };
-  const queryEmbedding = await generateEmbedding(question);
+  const queryEmbedding = await generateEmbedding(hypotheticalPassage);
   console.log(`[RAG stream] embedding done ${Date.now() - t0}ms`);
 
   const allChunks = await loadChunkCache();
@@ -640,9 +648,10 @@ export async function* streamAnswer(
     });
   }
 
-  const listKeywords = /\b(all|every|list|enumerate|how many|count)\b/i;
-  const isListQuery = listKeywords.test(question);
-  const topK = isListQuery ? ENV.ragTopKQA * 4 : ENV.ragTopKQA;
+  // Broad queries (summaries, descriptions, overviews) span many documents — use more chunks
+  const broadKeywords = /\b(all|every|list|enumerate|how many|count|summarize|summary|describe|overview|explain|background|experience|history|tell me|what has|how has)\b/i;
+  const isBroadQuery = broadKeywords.test(question);
+  const topK = isBroadQuery ? ENV.ragTopKQA * 3 : ENV.ragTopKQA;
 
   const relevantChunks = candidates
     .sort((a, b) => b.similarity - a.similarity)
@@ -729,5 +738,5 @@ export async function* streamAnswer(
     tokensOut = usage.output;
   }
 
-  yield { type: "done", sources, tokensInput: tokensIn, tokensOutput: tokensOut };
+  yield { type: "done", sources, tokensInput: tokensIn + hydeIn, tokensOutput: tokensOut + hydeOut };
 }

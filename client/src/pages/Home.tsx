@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { FileSearch, Brain, MessageSquare, ArrowRight, ChevronRight, Zap, GitBranch, Database, Box } from "lucide-react";
 import { useSiteName } from "@/hooks/useSiteName";
+import { useSiteConfig } from "@/hooks/useSiteConfig";
 
 const TYPING_PHRASES = [
   "Principal Engineer",
@@ -18,6 +19,7 @@ const TYPING_PHRASES = [
 export default function Home() {
   const [, navigate] = useLocation();
   const siteName = useSiteName();
+  const siteConfig = useSiteConfig();
   const [phraseIndex, setPhraseIndex] = useState(0);
   const [displayed, setDisplayed] = useState("");
   const [typing, setTyping] = useState(true);
@@ -75,7 +77,7 @@ export default function Home() {
             <h1 className="text-5xl xl:text-6xl font-bold leading-tight tracking-tight mb-4">
               The portfolio of{" "}
               <span className="bg-gradient-to-r from-blue-400 via-violet-400 to-indigo-300 bg-clip-text text-transparent">
-                Dennis "DZ" Zweigle
+                {siteConfig.candidateName}
               </span>
             </h1>
 
@@ -88,11 +90,14 @@ export default function Home() {
               {" "}role.
             </p>
 
-            <p className="text-slate-400 text-base leading-relaxed mb-10 max-w-lg">
-              Paste any job description. Get a scored match report grounded in actual portfolio
-              documents — hard skills, experience depth, domain knowledge, and soft signals
-              weighted, explained, and cited.
+            <p className="text-slate-400 text-base leading-relaxed mb-3 max-w-lg">
+              {siteConfig.heroTagline}
             </p>
+
+            <div className="mb-10 max-w-lg border-l-2 border-blue-500/40 pl-4">
+              <p className="text-white font-semibold text-sm mb-1">{siteConfig.matchPageTitle}</p>
+              <p className="text-slate-500 text-sm leading-relaxed">{siteConfig.matchPageDescription}</p>
+            </div>
 
             <div className="flex flex-wrap gap-4">
               <button
@@ -122,7 +127,7 @@ export default function Home() {
               <div className="flex items-center justify-between mb-5">
                 <div>
                   <div className="text-sm font-semibold text-white">Principal Engineer — Platform</div>
-                  <div className="text-xs text-slate-500 mt-0.5">Dennis "DZ" Zweigle · Portfolio Match Report</div>
+                  <div className="text-xs text-slate-500 mt-0.5">{siteConfig.candidateName} · Portfolio Match Report</div>
                 </div>
                 <span className="px-2 py-1 rounded-md bg-emerald-500/15 text-emerald-400 text-xs font-medium border border-emerald-500/25">
                   Live Analysis
@@ -250,7 +255,7 @@ export default function Home() {
       {/* ── Footer ───────────────────────────────────────────────────────── */}
       <footer className="relative z-10 border-t border-white/[0.06] py-6">
         <div className="container mx-auto px-6 flex justify-between items-center">
-          <p className="text-xs text-slate-700">{siteName} · Dennis "DZ" Zweigle</p>
+          <p className="text-xs text-slate-700">{siteName} · {siteConfig.candidateName}</p>
           <a href="/admin" className="text-xs text-slate-700 hover:text-slate-400 transition-colors">
             Admin
           </a>

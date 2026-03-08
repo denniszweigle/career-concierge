@@ -1,8 +1,10 @@
-# Personal Career Concierge
+# Agentic Zweigle — Personal Career Concierge
 
 **Author:** Dennis "DZ" Zweigle
 
-A RAG-based (Retrieval-Augmented Generation) web application that indexes career documents from Google Drive and uses vector similarity to match them against job descriptions, providing AI-powered match/mismatch analysis and conversational Q&A.
+A RAG-based (Retrieval-Augmented Generation) personal brand platform that indexes career documents from Google Drive and uses vector similarity to match them against job descriptions — delivering AI-powered match/mismatch analysis, conversational portfolio Q&A, and ATS-optimized resume tailoring.
+
+Built by Dennis "DZ" Zweigle as a personal tool and designed to be released as **open source** so anyone can deploy their own AI-powered career identity — tailored to their personality, voice, and background. The goal: democratize AI-driven career positioning and keep AI transparent, human-centered, and accessible.
 
 ---
 
@@ -214,9 +216,10 @@ For full localhost auth setup details see [`docs/oauth_setup_instructions.md`](d
 6. No DB save — ephemeral output only
 
 **Portfolio Q&A** (`POST /api/stream-answer` SSE endpoint):
-1. Embeds the question directly and runs a cosine similarity scan against the in-memory chunk cache
-2. Top `RAG_TOP_K_QA` (default 8) passages retrieved; list queries ("list all patents", "how many...") automatically expand the pool
-3. SSE streaming — answer streams token-by-token; client shows cycling adjective + elapsed time during retrieval, then renders text progressively; token usage (`in · out`) shown after completion
+1. **HyDE (Hypothetical Document Embedding)** — before searching, an LLM generates a dense hypothetical career passage that *would* answer the question; that passage is embedded instead of the raw question, dramatically improving recall for broad/summary queries where question vocabulary differs from document vocabulary
+2. Cosine similarity scan against the in-memory chunk cache using the HyDE embedding
+3. Top `RAG_TOP_K_QA` (default 8) passages retrieved; broad queries ("summarize", "describe", "overview", "experience") automatically expand to 3× the pool; list queries ("list all", "how many") expand to 4×
+4. SSE streaming — answer streams token-by-token; client shows status messages during retrieval, then renders text progressively; token usage (`in · out`) shown after completion
 
 ### Directory Structure
 
@@ -286,42 +289,17 @@ No database entries are created — the output is ephemeral.
 
 ### System prompt
 
-<details>
-<summary>View full ATS optimization prompt</summary>
+The tailor system prompt lives in **`data/tailor-prompt.md`** — a plain text file that can be edited at any time without redeploying. It is cached in memory on first use and can be refreshed live from the Admin page without restarting the server.
 
-```
-You are an expert Technical Career Strategist and ATS Optimization Engine.
-Rewrite Dennis Zweigle's resume and cover letter to align with the provided Job Description.
+Key sections in the prompt:
+- **CANDIDATE IDENTITY** — AIGP cert, MIT AI Strategy, SWARM Tech AI role, team size range, key metrics to front-load
+- **BRIDGE STRATEGY** — rules for bridging equivalent technologies when a JD skill isn't directly present (with examples)
+- **STRUCTURAL TEMPLATE** — instructs the LLM to mirror the ATS section order of the starred (primary) resume exactly
+- **THOUGHT LEADERSHIP SIGNALS** — signature differentiators to surface when JD context fits: blockchain asset tokenization ($130T addressable market), AI workforce displacement curriculum (1.5M pathway), open-source AI career platform vision, and the 6–7 year paradigm cadence
+- **RESUME INSTRUCTIONS** — keyword injection, chronological format, quantifiable impact front-loading
+- **COVER LETTER INSTRUCTIONS** — hook, governance angle for regulated industries, thought leadership closing
 
-OBJECTIVE: 95%+ keyword match to bypass ATS filters while maintaining 100% factual integrity.
-
-BRIDGE STRATEGY (critical):
-- If JD requires a technology Dennis doesn't list but he has an equivalent skill, bridge them.
-- Example: JD asks for AWS SageMaker → "Architected enterprise-grade MLOps solutions (Google Cloud/Vertex AI), equivalent to AWS SageMaker environments"
-- Example: JD asks for Azure DevOps → highlight GitLab/GitHub CI/CD and Hetzner infrastructure as transferable DevOps expertise
-
-RESUME INSTRUCTIONS:
-- Keyword Injection: Scrape JD for hard skills; integrate naturally into Professional Summary and Skills
-- Structural Integrity: Maintain chronological format, starting with Sr. Staff AI & Data Solutions Architect at SWARM Tech AI
-- Quantifiable Impact: Front-load metrics (invoice creation 25 days → 2 days, $30M claims, etc.)
-- Tone: Professional, innovative, authoritative
-- ATS Format: Use clean section headers, standard fonts, no tables/columns — maximize ATS parseability
-
-COVER LETTER INSTRUCTIONS:
-- Hook: Open with Dennis's unique value proposition — 7 years of progressive AI architecture mastery, from early ML pipelines to cutting-edge agentic RAG systems
-- Pivot: Explicitly address the JD's primary pain point and highlight his AIGP (IAPP) certification and MIT AI Strategy background as trust signals
-- The "Why": Connect his founding of startups and leading teams of 10+ developers to the company's growth needs
-- Tone: Confident, specific, compelling — not generic
-
-OUTPUT FORMAT (exact):
-### CUSTOM_RESUME
-[resume content — ## for section headers, - for bullet points]
-
-### CUSTOM_COVER_LETTER
-[cover letter content — paragraphs only]
-```
-
-</details>
+To edit: update `data/tailor-prompt.md` directly, then click **Refresh Prompt Cache** in Admin → AI Tailor System Prompt.
 
 ### Codebase locations
 
@@ -367,7 +345,12 @@ Deployed on a Hetzner VPS using Docker Compose with Caddy as a reverse proxy for
 
 See [`docs/hetzner_deployment.md`](docs/hetzner_deployment.md) for the full step-by-step guide.
 
-CI/CD is handled by GitHub Actions (`.github/workflows/deploy.yml`): every push to `main` runs type-check and unit tests, then SSHes into the Hetzner server to pull and rebuild automatically.
+CI/CD is handled by GitHub Actions (`.github/workflows/deploy.yml`) in three stages:
+1. **Type-check & unit tests** — runs `pnpm check` + `pnpm test` on every push to `main`
+2. **Build & push Docker image** — builds the production image in GitHub Actions (with GHA layer caching) and pushes to GitHub Container Registry (`ghcr.io`)
+3. **Deploy** — SSHs into the Hetzner server, pulls the pre-built image from ghcr.io, and runs `docker compose up -d` — no server-side build, deploy completes in under 2 minutes
+
+The SQLite database and Caddy TLS certificates persist across deploys via Docker named volumes (`sqlite_data`, `caddy_data`).
 
 ---
 

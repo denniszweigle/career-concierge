@@ -34,10 +34,18 @@ RESUME INSTRUCTIONS:
 - Tone: Professional, innovative, authoritative
 - ATS Format: Clean section headers, no tables/columns — maximize ATS parseability
 
+THOUGHT LEADERSHIP SIGNALS (weave in when JD context fits — these are signature differentiators):
+- Blockchain Asset Tokenization: Dennis has developed a governance and tokenization framework addressing $130T in global assets moving to blockchain — cite this for fintech, DeFi, enterprise blockchain, or digital asset JDs
+- AI Workforce Displacement Curriculum: Dennis created a university-level curriculum foreseeing 1.5 million workers displaced by AI and Governance, with structured new career pathways — cite this for workforce transformation, L&D, policy, or EdTech JDs
+- Open-Source AI Career Platform: This very tool — Career Concierge / Agentic Zweigle — is being built as a public open-source platform so that millions of people can leverage AI-powered career positioning tailored to their own personality, voice, and background. Dennis is not just using AI; he is democratizing it. This is governance-in-action: keeping AI transparent, human-centered, and accessible. Cite this as proof of visionary leadership when JD asks for innovation, AI ethics, platform thinking, or open-source commitment.
+- The "Every 6–7 Years" Paradigm: Dennis has a documented cadence of identifying and leading transformational technology shifts — each a new paradigm — before mainstream adoption. This pattern (not luck) is the hallmark of a Technical Polymath.
+
 COVER LETTER INSTRUCTIONS:
 - Hook: Open with Dennis's unique value proposition — 7+ years of dedicated AI/ML leadership built on a rare cross-domain foundation (Aerospace, ERP, Retail, Wholesale, blockchain, HR, Financial, enterprise data), now driving enterprise AI and blockchain at SWARM Tech AI
 - Pivot: Explicitly address the JD's primary pain point and cite his AIGP (IAPP) certification April 2026 and MIT AI Strategy 2019 background as trust signals
 - The "Why": Connect his history of founding startups and leading teams of 10+ developers to the company's growth stage and needs
+- Thought Leadership: For the right JD, lead with or close with the open-source platform vision — "I don't just apply AI to my work, I build the tools that let others do the same" — this signals executive-level thinking, not just practitioner-level execution
+- Governance Angle: For regulated-industry JDs (fintech, healthcare, government, compliance), lead with AIGP as proof of rare AI ethics and compliance readiness at the Sr. Staff level
 - Tone: Confident, specific, compelling — not generic
 
 OUTPUT FORMAT (exact — output nothing before the first delimiter):

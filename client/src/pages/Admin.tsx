@@ -61,17 +61,27 @@ export default function Admin() {
     enabled: isAuthenticated,
   });
   const [siteNameDraft, setSiteNameDraft] = useState("");
+  const [candidateNameDraft, setCandidateNameDraft] = useState("");
+  const [heroTaglineDraft, setHeroTaglineDraft] = useState("");
+  const [matchPageTitleDraft, setMatchPageTitleDraft] = useState("");
+  const [matchPageDescDraft, setMatchPageDescDraft] = useState("");
+  const [chatPageDescDraft, setChatPageDescDraft] = useState("");
   useEffect(() => {
-    if (siteConfigQuery.data?.siteName !== undefined) {
-      setSiteNameDraft(siteConfigQuery.data.siteName);
+    if (siteConfigQuery.data) {
+      setSiteNameDraft(siteConfigQuery.data.siteName ?? "");
+      setCandidateNameDraft(siteConfigQuery.data.candidateName ?? "");
+      setHeroTaglineDraft(siteConfigQuery.data.heroTagline ?? "");
+      setMatchPageTitleDraft(siteConfigQuery.data.matchPageTitle ?? "");
+      setMatchPageDescDraft(siteConfigQuery.data.matchPageDescription ?? "");
+      setChatPageDescDraft(siteConfigQuery.data.chatPageDescription ?? "");
     }
-  }, [siteConfigQuery.data?.siteName]);
+  }, [siteConfigQuery.data]);
   const saveSiteConfig = trpc.system.saveSiteConfig.useMutation({
     onSuccess: () => {
-      toast.success("Site name saved");
+      toast.success("Site settings saved");
       utils.system.getSiteConfig.invalidate();
     },
-    onError: () => toast.error("Failed to save site name"),
+    onError: () => toast.error("Failed to save site settings"),
   });
 
   const syncStatusQuery = trpc.drive.getSyncStatus.useQuery(undefined, {
@@ -458,28 +468,88 @@ export default function Admin() {
           </Card>
         </div>
 
-        {/* Site Name Editor */}
+        {/* Site Settings Editor */}
         <Card className="mt-6">
           <CardHeader>
-            <CardTitle>Site Name</CardTitle>
-            <CardDescription>Shown in the browser tab, nav bar, and page headers.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={siteNameDraft}
-                onChange={e => setSiteNameDraft(e.target.value)}
-                className="flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
-                placeholder="Agentic DZ"
-              />
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle>Site Settings</CardTitle>
+                <CardDescription>Customize the name, candidate identity, and page copy. Changes take effect immediately.</CardDescription>
+              </div>
               <Button
-                onClick={() => saveSiteConfig.mutate({ siteName: siteNameDraft })}
+                onClick={() => saveSiteConfig.mutate({
+                  siteName: siteNameDraft,
+                  candidateName: candidateNameDraft,
+                  heroTagline: heroTaglineDraft,
+                  matchPageTitle: matchPageTitleDraft,
+                  matchPageDescription: matchPageDescDraft,
+                  chatPageDescription: chatPageDescDraft,
+                })}
                 disabled={saveSiteConfig.isPending || !siteNameDraft.trim()}
               >
                 {saveSiteConfig.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Save
+                Save All
               </Button>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Site Name</label>
+                <input
+                  type="text"
+                  value={siteNameDraft}
+                  onChange={e => setSiteNameDraft(e.target.value)}
+                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                  placeholder="Agentic Me"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Candidate Name</label>
+                <input
+                  type="text"
+                  value={candidateNameDraft}
+                  onChange={e => setCandidateNameDraft(e.target.value)}
+                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                  placeholder='Dennis "DZ" Zweigle'
+                />
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Home Page — Hero Tagline</label>
+              <textarea
+                value={heroTaglineDraft}
+                onChange={e => setHeroTaglineDraft(e.target.value)}
+                rows={3}
+                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring resize-y"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Match Page — Title</label>
+              <input
+                type="text"
+                value={matchPageTitleDraft}
+                onChange={e => setMatchPageTitleDraft(e.target.value)}
+                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Match Page — Description</label>
+              <textarea
+                value={matchPageDescDraft}
+                onChange={e => setMatchPageDescDraft(e.target.value)}
+                rows={4}
+                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring resize-y"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Chat Page — Description</label>
+              <input
+                type="text"
+                value={chatPageDescDraft}
+                onChange={e => setChatPageDescDraft(e.target.value)}
+                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
+              />
             </div>
           </CardContent>
         </Card>

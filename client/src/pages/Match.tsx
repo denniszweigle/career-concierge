@@ -8,6 +8,7 @@ import { Loader2, ArrowRight, FileEdit, Download } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
+import { useSiteConfig } from "@/hooks/useSiteConfig";
 
 const MATCH_ADJECTIVES = ["Analyzing", "Extracting", "Processing", "Evaluating", "Searching", "Matching", "Computing", "Scoring"];
 const TAILOR_ADJECTIVES = ["Crafting", "Optimizing", "Tailoring", "Aligning", "Bridging", "Weaving", "Sharpening", "Polishing"];
@@ -133,6 +134,7 @@ function parseTailorOutput(fullText: string): { resume: string; coverLetter: str
 }
 
 export default function Match() {
+  const siteConfig = useSiteConfig();
   const [, navigate] = useLocation();
   const [jobTitle, setJobTitle] = useState("");
   const [jobDescription, setJobDescription] = useState("");
@@ -317,11 +319,8 @@ export default function Match() {
       <main className="container mx-auto px-4 py-12">
 
         <div className="text-center max-w-3xl mx-auto mb-12">
-          <h1 className="text-4xl font-bold text-foreground mb-4">Analyze a Job Description</h1>
-          <p className="text-xl text-muted-foreground">
-            Paste any job description to match it against Dennis "DZ" Zweigle's indexed portfolio
-            documents and receive a transparent Match vs. Mismatch report.
-          </p>
+          <h1 className="text-4xl font-bold text-foreground mb-4">{siteConfig.matchPageTitle}</h1>
+          <p className="text-xl text-muted-foreground">{siteConfig.matchPageDescription}</p>
         </div>
 
         {/* Job Analysis Form */}

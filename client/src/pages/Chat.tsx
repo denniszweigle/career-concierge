@@ -4,6 +4,7 @@ import { Loader2, Send, Sparkles, Bot, FileText, ChevronLeft, ChevronRight } fro
 import { useState, useRef, useEffect } from "react";
 import { toast } from "sonner";
 import { Streamdown } from "streamdown";
+import { useSiteConfig } from "@/hooks/useSiteConfig";
 
 type Source = { documentId: number; fileName: string; driveFileId: string; fileType: string; similarity: number };
 type Message = { role: "user" | "assistant"; content: string; sources?: Source[]; tokens?: { input: number; output: number } };
@@ -142,6 +143,7 @@ export default function Chat() {
     }
   };
 
+  const siteConfig = useSiteConfig();
   const hasMessages = history.length > 0;
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
@@ -151,7 +153,7 @@ export default function Chat() {
       {/* Page header */}
       <div className="bg-card border-b px-6 py-3 flex-shrink-0">
         <h1 className="text-lg font-semibold text-foreground">Portfolio Chat</h1>
-        <p className="text-xs text-muted-foreground">Ask anything about Dennis — answers grounded in indexed portfolio documents</p>
+        <p className="text-xs text-muted-foreground">{siteConfig.chatPageDescription}</p>
       </div>
 
       <div className="flex flex-1 overflow-hidden">
