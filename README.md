@@ -147,16 +147,19 @@ LANGCHAIN_PROJECT=<project-name>
 
 ### LLM Tuning (all have defaults)
 
+These set the baseline values. Most can also be overridden live from **Admin → Engine Settings** without editing `.env` — see [Engine Settings](#admin--engine-settings) for details.
+
 ```env
 LLM_MODEL                 # default: gpt-4o-mini
 LLM_MAX_TOKENS            # default: 8192
 LLM_TEMPERATURE           # default: 0.1
-EMBEDDING_MODEL           # default: text-embedding-3-small
-CHUNK_SIZE                # default: 1000 (chars)
-CHUNK_OVERLAP             # default: 200 (chars)
-RAG_TOP_K_STAGE1          # default: 20 (Stage 1 cosine scan candidate pool)
-RAG_TOP_K_EVIDENCE        # default: 8 (Stage 2 re-ranker final passage count)
-RAG_STRENGTH_THRESHOLD    # default: 50 (0–100 score cutoff for strength vs gap)
+EMBEDDING_MODEL           # default: text-embedding-3-small (not UI-tunable — used at embedding time)
+CHUNK_SIZE                # default: 1000 (chars) — UI-tunable, requires re-sync
+CHUNK_OVERLAP             # default: 200 (chars)  — UI-tunable, requires re-sync
+RAG_TOP_K_STAGE1          # default: 20 (Stage 1 cosine scan pool — internal, not UI-tunable)
+RAG_TOP_K_EVIDENCE        # default: 3  — UI-tunable, takes effect immediately
+RAG_TOP_K_QA              # default: 5  — UI-tunable, takes effect immediately
+RAG_STRENGTH_THRESHOLD    # default: 50 (0–100) — UI-tunable, takes effect immediately
 ```
 
 ---
@@ -370,6 +373,65 @@ To edit: update `data/tailor-prompt.md` directly, then click **Refresh Prompt Ca
 | `server/_core/index.ts` | `POST /api/stream-tailor` SSE endpoint |
 | `client/src/pages/Match.tsx` | Tailor button, status UI, tab output, PDF download |
 | `client/src/pages/Analysis.tsx` | Tailor button in top bar + above score cards; inline output with PDF download |
+
+---
+
+## Admin — Engine Settings
+
+The **Engine Settings** card in Admin (`/admin`) exposes all tunable AI parameters through a tabbed UI. Settings are saved to `data/engine-config.json` and override the corresponding `.env` values without requiring a redeployment.
+
+### Tabs
+
+| Tab | Settings | When changes take effect |
+|---|---|---|
+| **Matching & Scoring** | Strength Threshold, Evidence Chunks | Immediately — next match run |
+| **Q&A Retrieval** | Answer Passages | Immediately — next question |
+| **LLM Behavior** | Model, Temperature, Max Tokens | Server restart required |
+| **Document Chunking** | Chunk Size, Chunk Overlap | Full re-sync required |
+
+### Setting Descriptions
+
+#### Matching & Scoring
+
+**Strength Threshold** (`ragStrengthThreshold`, default `60` in `.env`, recommended `50–55`)
+The score cutoff that decides whether portfolio evidence counts as a strength or a gap. If a chunk's cosine similarity score (0–100) meets or exceeds this number, the requirement is classified as a Top Strength. Below it, it's a Top Gap — even if the match is close.
+
+> Lower this if you're seeing accurate skills flagged as gaps. A score of 59% on "Artificial Intelligence" at threshold 60 = gap; at threshold 55 = strength.
+
+**Evidence Chunks per Requirement** (`ragTopKEvidence`, default `3`, recommended `3–8`)
+How many portfolio passages the AI retrieves per JD requirement when running a match. More passages = broader coverage and higher average scores, but slower and more expensive per run.
+
+#### Q&A Retrieval
+
+**Answer Passages** (`ragTopKQA`, default `5`, recommended `5–12`)
+How many portfolio chunks the AI reads before writing a response in the chat panel. Raise this if Q&A answers feel incomplete or miss known facts. Broad/summary questions automatically use 3× this value; list queries use 4×.
+
+#### LLM Behavior *(restart required)*
+
+**Model** (`llmModel`, default `gpt-4o-mini`)
+The model identifier sent to the OpenAI-compatible endpoint for all generation tasks: match reports, Q&A answers, requirement extraction, and resume tailoring. Must be a model your API key can access.
+
+**Temperature** (`llmTemperature`, default `0.1`, range `0.0–1.0`)
+Controls response creativity vs. consistency. Low values (0.0–0.2) keep output deterministic and structured — ideal for scoring and extraction. Higher values (0.3–0.5) produce more varied prose — useful if cover letters feel formulaic.
+
+**Max Tokens** (`llmMaxTokens`, default `8192`, range `512–32768`)
+Maximum output length for any single LLM response. A full tailored resume + cover letter typically uses 3,000–5,000 output tokens. Do not set below 4,000 or the tailor will truncate.
+
+#### Document Chunking *(re-sync required)*
+
+**Chunk Size** (`chunkSize`, default `1000`, recommended `800–1200`)
+Characters per document chunk when indexing files from Google Drive. Smaller = more precise retrieval. Larger = more context per chunk. After changing, run Admin → Sync Documents to rebuild all chunks.
+
+**Chunk Overlap** (`chunkOverlap`, default `200`, recommended `150–250`)
+Characters shared between adjacent chunks. Prevents important sentences from being split at a boundary. A sentence like "Reduced invoice cycle from 25 days to 2 days — saving $400K annually" will have both halves represented with sufficient overlap.
+
+### Persistence
+
+Settings are stored in `data/engine-config.json`. This file:
+- Overrides `.env` values for the matching and retrieval pipeline
+- Persists across server restarts
+- Is excluded from git (add to `.gitignore` if deploying — or commit it intentionally to carry settings to production)
+- Falls back to `.env` values if the file is deleted or a key is missing
 
 ---
 

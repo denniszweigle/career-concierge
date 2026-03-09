@@ -14,6 +14,7 @@ import {
 } from "./googleDrive";
 import { google } from 'googleapis';
 import { ENV } from './_core/env';
+import { getEngineConfig } from './_core/runtimeConfig';
 import {
   saveDriveToken,
   getDriveToken,
@@ -221,8 +222,9 @@ export const appRouter = router({
               isIndexed: false,
             });
 
-            // Generate chunks and embeddings
-            const chunks = chunkText(extractedText);
+            // Generate chunks and embeddings (use runtime config for chunk sizing)
+            const { chunkSize, chunkOverlap } = getEngineConfig();
+            const chunks = chunkText(extractedText, chunkSize, chunkOverlap);
             for (let i = 0; i < chunks.length; i++) {
               const embedding = await generateEmbedding(chunks[i]!);
               await saveDocumentChunk({

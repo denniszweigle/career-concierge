@@ -2,7 +2,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Loader2, TrendingUp, TrendingDown, Send, Sparkles, FileText, FileEdit, Download } from "lucide-react";
+import { Loader2, TrendingUp, TrendingDown, Send, Sparkles, FileText, FileEdit, Download, Pencil, Eye } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { useParams } from "wouter";
 import { useState, useRef, useEffect } from "react";
@@ -150,6 +150,8 @@ export default function Analysis() {
   const [resumeText, setResumeText] = useState("");
   const [coverLetterText, setCoverLetterText] = useState("");
   const [tailorDone, setTailorDone] = useState(false);
+  const [resumeEditMode, setResumeEditMode] = useState(false);
+  const [coverLetterEditMode, setCoverLetterEditMode] = useState(false);
   const tailorRef = useRef<HTMLDivElement>(null);
 
   const analysis = trpc.analysis.get.useQuery({ id: analysisId });
@@ -703,7 +705,18 @@ export default function Analysis() {
                       </TabsList>
 
                       <TabsContent value="resume">
-                        <div className="flex justify-end mb-3">
+                        <div className="flex items-center justify-between mb-3">
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => setResumeEditMode(m => !m)}
+                          >
+                            {resumeEditMode ? (
+                              <><Eye className="mr-2 h-4 w-4" />Preview</>
+                            ) : (
+                              <><Pencil className="mr-2 h-4 w-4" />Edit</>
+                            )}
+                          </Button>
                           <Button
                             size="sm"
                             variant="outline"
@@ -716,13 +729,34 @@ export default function Analysis() {
                             Download Resume PDF
                           </Button>
                         </div>
-                        <div className="rounded-lg border bg-muted/20 p-4 max-h-[600px] overflow-y-auto">
-                          <ContentPreview content={resumeText} />
-                        </div>
+                        {resumeEditMode ? (
+                          <textarea
+                            value={resumeText}
+                            onChange={e => setResumeText(e.target.value)}
+                            rows={30}
+                            className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm font-mono focus:outline-none focus:ring-1 focus:ring-ring resize-y"
+                            spellCheck={false}
+                          />
+                        ) : (
+                          <div className="rounded-lg border bg-muted/20 p-4 max-h-[600px] overflow-y-auto">
+                            <ContentPreview content={resumeText} />
+                          </div>
+                        )}
                       </TabsContent>
 
                       <TabsContent value="cover-letter">
-                        <div className="flex justify-end mb-3">
+                        <div className="flex items-center justify-between mb-3">
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => setCoverLetterEditMode(m => !m)}
+                          >
+                            {coverLetterEditMode ? (
+                              <><Eye className="mr-2 h-4 w-4" />Preview</>
+                            ) : (
+                              <><Pencil className="mr-2 h-4 w-4" />Edit</>
+                            )}
+                          </Button>
                           <Button
                             size="sm"
                             variant="outline"
@@ -735,9 +769,19 @@ export default function Analysis() {
                             Download Cover Letter PDF
                           </Button>
                         </div>
-                        <div className="rounded-lg border bg-muted/20 p-4 max-h-[600px] overflow-y-auto">
-                          <ContentPreview content={coverLetterText} />
-                        </div>
+                        {coverLetterEditMode ? (
+                          <textarea
+                            value={coverLetterText}
+                            onChange={e => setCoverLetterText(e.target.value)}
+                            rows={20}
+                            className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm font-mono focus:outline-none focus:ring-1 focus:ring-ring resize-y"
+                            spellCheck={false}
+                          />
+                        ) : (
+                          <div className="rounded-lg border bg-muted/20 p-4 max-h-[600px] overflow-y-auto">
+                            <ContentPreview content={coverLetterText} />
+                          </div>
+                        )}
                       </TabsContent>
                     </Tabs>
                   </CardContent>

@@ -2,6 +2,7 @@ import { z } from "zod";
 import { SystemMessage, HumanMessage } from "@langchain/core/messages";
 import { llm } from "./_core/llm";
 import { ENV } from "./_core/env";
+import { getEngineConfig } from "./_core/runtimeConfig";
 import { generateEmbedding, cosineSimilarity } from "./vectorEmbedding";
 import { getChunksBatchWithDocuments } from "./db";
 
@@ -94,6 +95,16 @@ type EvidenceItem = { requirement: string; evidence: string[]; score: number };
 // ---------------------------------------------------------------------------
 // Requirement extraction — Chain of Density over the job description text only
 // ---------------------------------------------------------------------------
+function deduplicateRequirements(reqs: string[]): string[] {
+  const seen = new Set<string>();
+  return reqs.filter(r => {
+    const key = r.toLowerCase().trim();
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
 export async function extractJobRequirements(jobDescription: string): Promise<
   JobRequirements & { allRequirements: string[] }
 > {
@@ -116,13 +127,21 @@ ${GROUNDING_DIRECTIVE}`
     ),
   ]);
 
+  const hardSkills = deduplicateRequirements(result.hardSkills);
+  const experienceRequirements = deduplicateRequirements(result.experienceRequirements);
+  const domainKnowledge = deduplicateRequirements(result.domainKnowledge);
+  const softSkills = deduplicateRequirements(result.softSkills);
+
   return {
-    ...result,
+    hardSkills,
+    experienceRequirements,
+    domainKnowledge,
+    softSkills,
     allRequirements: [
-      ...result.hardSkills,
-      ...result.experienceRequirements,
-      ...result.domainKnowledge,
-      ...result.softSkills,
+      ...hardSkills,
+      ...experienceRequirements,
+      ...domainKnowledge,
+      ...softSkills,
     ],
   };
 }
@@ -208,7 +227,7 @@ async function findEvidenceForRequirements(
 ): Promise<EvidenceItem[]> {
   if (requirements.length === 0) return [];
 
-  const topK = ENV.ragTopKEvidence;
+  const topK = getEngineConfig().ragTopKEvidence;
   // Embed all requirements up front in parallel
   const reqEmbeddings = await Promise.all(requirements.map(r => generateEmbedding(r)));
 
@@ -230,11 +249,17 @@ async function findEvidenceForRequirements(
     const top = (candidates[ri] ?? [])
       .sort((a, b) => b.similarity - a.similarity)
       .slice(0, topK);
-    const avgSimilarity = top.reduce((sum, m) => sum + m.similarity, 0) / (top.length || 1);
+    // Max-pooling: score = top chunk similarity only.
+    // A requirement is "met" when ANY document chunk is strong evidence —
+    // averaging over additional chunks unfairly penalises candidates whose
+    // evidence is concentrated in one document, and vocabulary mismatch
+    // between JD phrasing and portfolio language already suppresses raw
+    // similarity values. Using the maximum preserves the strongest signal.
+    const score = (top[0]?.similarity ?? 0) * 100;
     return {
       requirement,
       evidence: top.map(m => m.content.substring(0, 200)),
-      score: avgSimilarity * 100,
+      score,
     };
   });
 }
@@ -263,7 +288,7 @@ async function generateDetailedAnalysis(
     softSkillsScore: number;
   }
 ): Promise<{ topStrengths: string[]; topGaps: string[]; report: string; tokensInput: number; tokensOutput: number }> {
-  const threshold = ENV.ragStrengthThreshold;
+  const threshold = getEngineConfig().ragStrengthThreshold;
 
   const allEvidence = [
     ...evidence.hardSkills.map(e => ({ ...e, category: "Hard Skills" })),
@@ -282,11 +307,17 @@ async function generateDetailedAnalysis(
     .slice(0, 3)
     .map(e => `${e.category}: ${e.requirement}`);
 
-  // Build an evidence summary — send top 3 passages per item for richer context
-  const evidenceSummary = allEvidence
-    .slice(0, 10)
+  // Build evidence summary scoped only to the reported strengths and gaps
+  const reportedKeys = new Set([...topStrengths, ...topGaps].map(s => s));
+  const relevantEvidence = allEvidence.filter(
+    e => reportedKeys.has(`${e.category}: ${e.requirement}`)
+  );
+  const evidenceSummary = relevantEvidence
     .map(e => `[${e.category} | score ${e.score.toFixed(0)}%] ${e.requirement}\n  Evidence: ${e.evidence.slice(0, 3).join("\n---\n") || "none"}`)
     .join("\n\n");
+
+  const strengthCount = topStrengths.length;
+  const gapCount = topGaps.length;
 
   const response = await llm.invoke([
     new SystemMessage(
@@ -297,9 +328,9 @@ ${GROUNDING_DIRECTIVE}
 Your report MUST be based solely on:
 1. The numeric scores provided
 2. The retrieved evidence passages provided
-3. The requirement labels listed
+3. The requirement labels listed — write about EXACTLY the items listed, no more and no fewer
 
-Do not reference anything about this individual that is not explicitly present in the evidence passages below.`
+CRITICAL: Do not add, invent, or substitute any strength or gap not explicitly listed in the Strengths and Gaps sections below. The lists are final.`
     ),
     new HumanMessage(
       `Write a professional Match vs. Mismatch report using ONLY the data below.
@@ -313,19 +344,19 @@ Category Scores:
 - Domain Knowledge (20% weight): ${scores.domainScore.toFixed(1)}%
 - Soft Skills (10% weight): ${scores.softSkillsScore.toFixed(1)}%
 
-Top Strengths (score ≥ ${threshold}%):
+Top ${strengthCount} Strength${strengthCount !== 1 ? "s" : ""} (score ≥ ${threshold}% — write about EXACTLY these ${strengthCount}, no others):
 ${topStrengths.map((s, i) => `${i + 1}. ${s}`).join("\n") || "None above threshold"}
 
-Top Gaps (score < ${threshold}%):
+Top ${gapCount} Gap${gapCount !== 1 ? "s" : ""} (score < ${threshold}% — write about EXACTLY these ${gapCount}, no others):
 ${topGaps.map((g, i) => `${i + 1}. ${g}`).join("\n") || "None below threshold"}
 
-Retrieved Evidence (cite these passages directly — do not add external information):
+Retrieved Evidence (cite these passages to support the items listed above — do not use them to introduce additional strengths or gaps):
 ${evidenceSummary}
 
 Report structure:
 1. Overall alignment summary (2-3 sentences, numbers only from above)
-2. Top 3 strengths — cite the specific evidence passage for each
-3. Top 3 gaps — explain why each matters for this role
+2. ${strengthCount} strength${strengthCount !== 1 ? "s" : ""} — cite the specific evidence passage for each listed item only
+3. ${gapCount} gap${gapCount !== 1 ? "s" : ""} — explain why each listed item matters for this role
 4. Honest closing assessment`
     ),
   ]);
@@ -433,8 +464,9 @@ async function retrievePassages(
 ): Promise<{ relevantChunks: RetrievalCandidate[]; sources: AnswerSource[] }> {
   const listKeywords = /\b(all|every|list|enumerate|how many|count)\b/i;
   const isListQuery = listKeywords.test(question);
-  const topK = isListQuery ? ENV.ragTopKQA * 4 : ENV.ragTopKQA;
-  const stage1K = isListQuery ? ENV.ragTopKStage1 * 3 : ENV.ragTopKStage1;
+  const { ragTopKQA, ragTopKStage1 } = getEngineConfig();
+  const topK = isListQuery ? ragTopKQA * 4 : ragTopKQA;
+  const stage1K = isListQuery ? ragTopKStage1 * 3 : ragTopKStage1;
 
   const allChunks = await loadChunkCache();
   const candidates: RetrievalCandidate[] = [];
@@ -653,7 +685,8 @@ export async function* streamAnswer(
   // Broad queries span many documents — use more chunks for better coverage
   const broadKeywords = /\b(all|every|list|enumerate|how many|count|summarize|summary|describe|overview|explain|background|experience|history|tell me|what has|how has|how is|how does|how did|what is|what are|what does|applying|applied|approach|thoughts|vision|strategy)\b/i;
   const isBroadQuery = broadKeywords.test(question);
-  const topK = isBroadQuery ? ENV.ragTopKQA * 3 : ENV.ragTopKQA;
+  const qaTopK = getEngineConfig().ragTopKQA;
+  const topK = isBroadQuery ? qaTopK * 3 : qaTopK;
 
   const relevantChunks = candidates
     .sort((a, b) => b.similarity - a.similarity)

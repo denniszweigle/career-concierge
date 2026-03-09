@@ -3,6 +3,7 @@ import { readFileSync, writeFileSync } from "fs";
 import { join } from "path";
 import { notifyOwner } from "./notification";
 import { adminProcedure, publicProcedure, router } from "./trpc";
+import { getEngineConfig, saveEngineConfig } from "./runtimeConfig";
 
 const SITE_CONFIG_PATH = join(process.cwd(), "data", "site.config.json");
 
@@ -78,5 +79,27 @@ export const systemRouter = router({
       return {
         success: delivered,
       } as const;
+    }),
+
+  getEngineConfig: adminProcedure.query(() => getEngineConfig()),
+
+  saveEngineConfig: adminProcedure
+    .input(
+      z.object({
+        ragStrengthThreshold: z.number().min(0).max(100),
+        ragTopKEvidence: z.number().int().min(1).max(20),
+        ragTopKQA: z.number().int().min(1).max(30),
+        llmModel: z.string().min(1),
+        llmTemperature: z.number().min(0).max(1),
+        llmMaxTokens: z.number().int().min(512).max(32768),
+        chunkSize: z.number().int().min(200).max(4000),
+        chunkOverlap: z.number().int().min(0).max(1000),
+      })
+    )
+    .mutation(({ input }) => {
+      // Preserve internal fields not exposed in the UI (e.g. ragTopKStage1)
+      const current = getEngineConfig();
+      saveEngineConfig({ ...current, ...input });
+      return { success: true };
     }),
 });

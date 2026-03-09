@@ -1,5 +1,6 @@
 import { embeddings } from "./_core/llm";
 import { ENV } from "./_core/env";
+import { getEngineConfig } from "./_core/runtimeConfig";
 
 export async function generateEmbedding(text: string): Promise<number[]> {
   return embeddings.embedQuery(text);
@@ -31,7 +32,7 @@ export function cosineSimilarity(vecA: number[], vecB: number[]): number {
 export function findTopMatches(
   queryEmbedding: number[],
   chunks: Array<{ id: number; embedding: number[]; content: string }>,
-  topK: number = ENV.ragTopKEvidence
+  topK: number = getEngineConfig().ragTopKEvidence
 ): Array<{ id: number; content: string; similarity: number }> {
   return chunks
     .map(chunk => ({
