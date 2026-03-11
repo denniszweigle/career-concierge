@@ -25,7 +25,7 @@ function extractUsage(response: { usage_metadata?: any; response_metadata?: any 
 }
 
 export type AnswerSource = {
-  documentId: number;
+  documentId: string;
   fileName: string;
   driveFileId: string;
   fileType: string;
@@ -452,7 +452,7 @@ async function generateHypotheticalPassage(question: string): Promise<{ passage:
 type RetrievalCandidate = {
   content: string;
   similarity: number;
-  documentId: number;
+  documentId: string;
   fileName: string;
   driveFileId: string;
   fileType: string;
@@ -499,7 +499,7 @@ async function retrievePassages(
   );
 
   // Deduplicate sources by documentId, keeping highest similarity per doc
-  const sourceMap = new Map<number, AnswerSource>();
+  const sourceMap = new Map<string, AnswerSource>();
   for (const chunk of relevantChunks) {
     const existing = sourceMap.get(chunk.documentId);
     if (!existing || chunk.similarity > existing.similarity) {
@@ -693,7 +693,7 @@ export async function* streamAnswer(
     .slice(0, topK);
 
   // Deduplicate sources by documentId
-  const sourceMap = new Map<number, AnswerSource>();
+  const sourceMap = new Map<string, AnswerSource>();
   for (const chunk of relevantChunks) {
     const existing = sourceMap.get(chunk.documentId);
     if (!existing || chunk.similarity > existing.similarity) {

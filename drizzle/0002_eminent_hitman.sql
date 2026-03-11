@@ -1,1 +1,0 @@
-ALTER TABLE `documents` ADD `is_primary_resume` integer DEFAULT false;

@@ -108,3 +108,9 @@ temp/
 
 # Webdev artifacts (checkpoint zips, migrations, etc.)
 .webdev/
+
+# Firebase service account (contains private key — never commit)
+firebase-service-account.json
+
+# Kubernetes secrets (contain env vars — apply via kubectl, never commit)
+k8s/secret.yaml

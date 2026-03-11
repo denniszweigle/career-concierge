@@ -15,7 +15,7 @@ const FILE_TYPES = ["pdf", "docx", "pptx", "xlsx", "txt"] as const;
 export default function Admin() {
   const { user, loading, isAuthenticated } = useAuth();
   const [, navigate] = useLocation();
-  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState<string>("all");
   const [sortKey, setSortKey] = useState<SortKey>("date-desc");

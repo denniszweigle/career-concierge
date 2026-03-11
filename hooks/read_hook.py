@@ -29,7 +29,7 @@ def check_path(raw: str) -> None:
 
 
 def main() -> None:
-    return 
+    return
     try:
         payload = json.loads(sys.stdin.buffer.read().decode("utf-8"))
     except (json.JSONDecodeError, Exception):

@@ -99,6 +99,7 @@ def cache_path(abs_file: str) -> Path:
 # ---------------------------------------------------------------------------
 
 def main() -> None:
+    return
     try:
         payload = json.loads(sys.stdin.buffer.read().decode("utf-8"))
     except Exception:

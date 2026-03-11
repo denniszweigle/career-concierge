@@ -2,8 +2,11 @@ export const ENV = {
   // Auth / Manus
   appId: process.env.VITE_APP_ID ?? "",
   cookieSecret: process.env.JWT_SECRET ?? "",
-  databaseUrl: process.env.DATABASE_URL ?? "",
   oAuthServerUrl: process.env.OAUTH_SERVER_URL ?? "",
+
+  // Firebase
+  firebaseProjectId: process.env.FIREBASE_PROJECT_ID ?? "",
+  firebaseServiceAccountKey: process.env.FIREBASE_SERVICE_ACCOUNT_KEY ?? "",
   ownerOpenId: process.env.OWNER_OPEN_ID ?? "",
   isProduction: process.env.NODE_ENV === "production",
 

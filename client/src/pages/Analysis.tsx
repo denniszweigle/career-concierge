@@ -134,10 +134,10 @@ function parseTailorOutput(fullText: string): { resume: string; coverLetter: str
 
 export default function Analysis() {
   const { id } = useParams<{ id: string }>();
-  const analysisId = parseInt(id || "0");
+  const analysisId = id || "";
   const [question, setQuestion] = useState("");
   const chatEndRef = useRef<HTMLDivElement>(null);
-  const [sourcesMap, setSourcesMap] = useState<Record<number, { documentId: number; fileName: string; driveFileId: string; fileType: string; similarity: number }[]>>({});
+  const [sourcesMap, setSourcesMap] = useState<Record<number, { documentId: string; fileName: string; driveFileId: string; fileType: string; similarity: number }[]>>({});
   const [isStreaming, setIsStreaming] = useState(false);
   const [streamingText, setStreamingText] = useState("");
 

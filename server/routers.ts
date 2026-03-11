@@ -232,6 +232,9 @@ export const appRouter = router({
                 chunkIndex: i,
                 content: chunks[i]!,
                 embedding,
+                documentFileName: file.name,
+                documentDriveFileId: file.id,
+                documentFileType: fileType,
               });
             }
             await markDocumentIndexed(documentId);
@@ -271,7 +274,7 @@ export const appRouter = router({
 
     // Delete one or more documents
     deleteDocuments: adminProcedure
-      .input(z.object({ ids: z.array(z.number()).min(1) }))
+      .input(z.object({ ids: z.array(z.string()).min(1) }))
       .mutation(async ({ input }) => {
         for (const id of input.ids) await deleteDocument(id);
         return { deleted: input.ids.length };
@@ -279,7 +282,7 @@ export const appRouter = router({
 
     // Mark a document as the primary resume
     setPrimaryResume: adminProcedure
-      .input(z.object({ id: z.number() }))
+      .input(z.object({ id: z.string() }))
       .mutation(async ({ input }) => {
         await setPrimaryResume(input.id);
         return { success: true };
@@ -351,7 +354,7 @@ export const appRouter = router({
     }),
 
     // Get specific analysis
-    get: publicProcedure.input(z.object({ id: z.number() })).query(async ({ input }) => {
+    get: publicProcedure.input(z.object({ id: z.string() })).query(async ({ input }) => {
       return getAnalysisById(input.id);
     }),
 
@@ -359,7 +362,7 @@ export const appRouter = router({
     askQuestion: publicProcedure
       .input(
         z.object({
-          analysisId: z.number(),
+          analysisId: z.string(),
           question: z.string(),
         })
       )
@@ -391,7 +394,7 @@ export const appRouter = router({
 
     // Get chat history
     getChatHistory: publicProcedure
-      .input(z.object({ analysisId: z.number() }))
+      .input(z.object({ analysisId: z.string() }))
       .query(async ({ input }) => {
         return getChatMessages(input.analysisId);
       }),

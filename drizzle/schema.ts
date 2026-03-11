@@ -1,115 +1,149 @@
-import { integer, real, text, sqliteTable } from "drizzle-orm/sqlite-core";
+// Plain TypeScript types — Drizzle ORM removed, backed by Firebase Firestore
 
-/**
- * Core user table backing auth flow.
- */
-export const users = sqliteTable("users", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
-  openId: text("openId").notNull().unique(),
-  name: text("name"),
-  email: text("email"),
-  loginMethod: text("loginMethod"),
-  role: text("role", { enum: ["user", "admin"] }).notNull().default("user"),
-  createdAt: integer("createdAt", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
-  updatedAt: integer("updatedAt", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()).$onUpdateFn(() => new Date()),
-  lastSignedIn: integer("lastSignedIn", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
-});
+export type User = {
+  id: string;
+  openId: string;
+  name: string | null;
+  email: string | null;
+  loginMethod: string | null;
+  role: 'user' | 'admin';
+  createdAt: Date;
+  updatedAt: Date;
+  lastSignedIn: Date;
+};
 
-export type User = typeof users.$inferSelect;
-export type InsertUser = typeof users.$inferInsert;
+export type InsertUser = {
+  openId: string;
+  name?: string | null;
+  email?: string | null;
+  loginMethod?: string | null;
+  role?: 'user' | 'admin';
+  lastSignedIn?: Date;
+};
 
-/**
- * Google Drive OAuth tokens for accessing the portfolio folder
- */
-export const driveTokens = sqliteTable("drive_tokens", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
-  userId: integer("userId").notNull().unique(),
-  accessToken: text("accessToken").notNull(),
-  refreshToken: text("refreshToken"),
-  expiresAt: integer("expiresAt", { mode: "timestamp" }).notNull(),
-  scope: text("scope").notNull(),
-  createdAt: integer("createdAt", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
-  updatedAt: integer("updatedAt", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()).$onUpdateFn(() => new Date()),
-});
+export type DriveToken = {
+  id: string;
+  userId: string;
+  accessToken: string;
+  refreshToken: string | null;
+  expiresAt: Date;
+  scope: string;
+  createdAt: Date;
+  updatedAt: Date;
+};
 
-export type DriveToken = typeof driveTokens.$inferSelect;
-export type InsertDriveToken = typeof driveTokens.$inferInsert;
+export type InsertDriveToken = {
+  userId: string;
+  accessToken: string;
+  refreshToken: string | null;
+  expiresAt: Date;
+  scope: string;
+};
 
-/**
- * Documents indexed from Google Drive
- */
-export const documents = sqliteTable("documents", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
-  driveFileId: text("driveFileId").notNull().unique(),
-  fileName: text("fileName").notNull(),
-  fileType: text("fileType", { enum: ["pdf", "docx", "pptx", "xlsx", "txt"] }).notNull(),
-  filePath: text("filePath").notNull(),
-  mimeType: text("mimeType").notNull(),
-  fileSize: integer("fileSize"),
-  modifiedTime: integer("modifiedTime", { mode: "timestamp" }),
-  extractedText: text("extractedText"),
-  isIndexed: integer("isIndexed", { mode: "boolean" }).notNull().default(false),
-  isPrimaryResume: integer("is_primary_resume", { mode: "boolean" }).default(false),
-  createdAt: integer("createdAt", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
-  updatedAt: integer("updatedAt", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()).$onUpdateFn(() => new Date()),
-});
+export type Document = {
+  id: string;
+  driveFileId: string;
+  fileName: string;
+  fileType: 'pdf' | 'docx' | 'pptx' | 'xlsx' | 'txt';
+  filePath: string;
+  mimeType: string;
+  fileSize: number | null;
+  modifiedTime: Date | null;
+  extractedText: string | null;
+  isIndexed: boolean;
+  isPrimaryResume: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+};
 
-export type Document = typeof documents.$inferSelect;
-export type InsertDocument = typeof documents.$inferInsert;
+export type InsertDocument = {
+  driveFileId: string;
+  fileName: string;
+  fileType: 'pdf' | 'docx' | 'pptx' | 'xlsx' | 'txt';
+  filePath: string;
+  mimeType: string;
+  fileSize?: number | null;
+  modifiedTime?: Date | null;
+  extractedText?: string | null;
+  isIndexed?: boolean;
+  isPrimaryResume?: boolean;
+};
 
-/**
- * Text chunks from documents for vector search
- */
-export const documentChunks = sqliteTable("document_chunks", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
-  documentId: integer("documentId").notNull(),
-  chunkIndex: integer("chunkIndex").notNull(),
-  content: text("content").notNull(),
-  embedding: text("embedding", { mode: "json" }).$type<number[]>(),
-  createdAt: integer("createdAt", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
-});
+export type DocumentChunk = {
+  id: string;
+  documentId: string;
+  chunkIndex: number;
+  content: string;
+  embedding: number[] | null;
+  // Denormalized from parent document (avoids collection-group queries)
+  documentFileName: string;
+  documentDriveFileId: string;
+  documentFileType: string;
+  createdAt: Date;
+};
 
-export type DocumentChunk = typeof documentChunks.$inferSelect;
-export type InsertDocumentChunk = typeof documentChunks.$inferInsert;
+export type InsertDocumentChunk = {
+  documentId: string;
+  chunkIndex: number;
+  content: string;
+  embedding?: number[] | null;
+  // Denormalized fields
+  documentFileName?: string;
+  documentDriveFileId?: string;
+  documentFileType?: string;
+};
 
-/**
- * Job description analysis sessions
- */
-export const analyses = sqliteTable("analyses", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
-  userId: integer("userId"),
-  jobTitle: text("jobTitle"),
-  jobDescription: text("jobDescription").notNull(),
-  matchScore: real("matchScore"),
-  mismatchScore: real("mismatchScore"),
-  hardSkillsScore: real("hardSkillsScore"),
-  experienceScore: real("experienceScore"),
-  domainScore: real("domainScore"),
-  softSkillsScore: real("softSkillsScore"),
-  topStrengths: text("topStrengths", { mode: "json" }).$type<string[]>(),
-  topGaps: text("topGaps", { mode: "json" }).$type<string[]>(),
-  detailedReport: text("detailedReport"),
-  tokensInput: integer("tokensInput"),
-  tokensOutput: integer("tokensOutput"),
-  createdAt: integer("createdAt", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
-  updatedAt: integer("updatedAt", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()).$onUpdateFn(() => new Date()),
-});
+export type Analysis = {
+  id: string;
+  userId: string | null;
+  jobTitle: string | null;
+  jobDescription: string;
+  matchScore: number | null;
+  mismatchScore: number | null;
+  hardSkillsScore: number | null;
+  experienceScore: number | null;
+  domainScore: number | null;
+  softSkillsScore: number | null;
+  topStrengths: string[] | null;
+  topGaps: string[] | null;
+  detailedReport: string | null;
+  tokensInput: number | null;
+  tokensOutput: number | null;
+  createdAt: Date;
+  updatedAt: Date;
+};
 
-export type Analysis = typeof analyses.$inferSelect;
-export type InsertAnalysis = typeof analyses.$inferInsert;
+export type InsertAnalysis = {
+  userId?: string | null;
+  jobTitle?: string | null;
+  jobDescription: string;
+  matchScore?: number | null;
+  mismatchScore?: number | null;
+  hardSkillsScore?: number | null;
+  experienceScore?: number | null;
+  domainScore?: number | null;
+  softSkillsScore?: number | null;
+  topStrengths?: string[] | null;
+  topGaps?: string[] | null;
+  detailedReport?: string | null;
+  tokensInput?: number | null;
+  tokensOutput?: number | null;
+};
 
-/**
- * Conversational Q&A messages for each analysis session
- */
-export const chatMessages = sqliteTable("chat_messages", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
-  analysisId: integer("analysisId").notNull(),
-  role: text("role", { enum: ["user", "assistant"] }).notNull(),
-  content: text("content").notNull(),
-  tokensInput: integer("tokensInput"),
-  tokensOutput: integer("tokensOutput"),
-  createdAt: integer("createdAt", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
-});
+export type ChatMessage = {
+  id: string;
+  analysisId: string;
+  role: 'user' | 'assistant';
+  content: string;
+  tokensInput: number | null;
+  tokensOutput: number | null;
+  createdAt: Date;
+};
 
-export type ChatMessage = typeof chatMessages.$inferSelect;
-export type InsertChatMessage = typeof chatMessages.$inferInsert;
+export type InsertChatMessage = {
+  analysisId: string;
+  role: 'user' | 'assistant';
+  content: string;
+  tokensInput?: number | null;
+  tokensOutput?: number | null;
+};

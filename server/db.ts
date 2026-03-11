@@ -1,333 +1,678 @@
-import { eq, desc, sql } from "drizzle-orm";
-import { drizzle } from "drizzle-orm/better-sqlite3";
-import Database from "better-sqlite3";
-import fs from "fs";
-import path from "path";
-import {
-  InsertUser,
-  users,
-  driveTokens,
-  InsertDriveToken,
-  DriveToken,
-  documents,
-  InsertDocument,
-  Document,
-  documentChunks,
-  InsertDocumentChunk,
-  DocumentChunk,
-  analyses,
-  InsertAnalysis,
-  Analysis,
-  chatMessages,
-  InsertChatMessage,
-  ChatMessage
-} from "../drizzle/schema";
+import { initializeApp, cert, getApps } from 'firebase-admin/app';
+import { getFirestore, type Firestore, type Timestamp } from 'firebase-admin/firestore';
 import { ENV } from './_core/env';
+import type {
+  User,
+  InsertUser,
+  DriveToken,
+  InsertDriveToken,
+  Document,
+  InsertDocument,
+  DocumentChunk,
+  InsertDocumentChunk,
+  Analysis,
+  InsertAnalysis,
+  ChatMessage,
+  InsertChatMessage,
+} from '../drizzle/schema';
 
-let _db: ReturnType<typeof drizzle> | null = null;
+// Re-export types so consumers can import from db.ts if needed
+export type {
+  User,
+  DriveToken,
+  Document,
+  DocumentChunk,
+  Analysis,
+  ChatMessage,
+};
 
-export function getDb() {
+// ---------------------------------------------------------------------------
+// Firebase initialization — lazy singleton
+// ---------------------------------------------------------------------------
+
+let _db: Firestore | null = null;
+
+function getDb(): Firestore {
   if (!_db) {
-    const dbPath = (process.env.DATABASE_URL ?? "file:./data/db.sqlite").replace(/^file:/, "");
-    const dir = path.dirname(dbPath);
-    if (!fs.existsSync(dir)) {
-      fs.mkdirSync(dir, { recursive: true });
+    if (getApps().length === 0) {
+      initializeApp({
+        credential: cert(JSON.parse(ENV.firebaseServiceAccountKey)),
+      });
     }
-    const sqlite = new Database(dbPath);
-    sqlite.pragma("journal_mode = WAL");
-    _db = drizzle(sqlite);
+    _db = getFirestore();
+    _db.settings({ ignoreUndefinedProperties: true });
   }
   return _db;
 }
 
+// ---------------------------------------------------------------------------
+// Timestamp helpers
+// ---------------------------------------------------------------------------
+
+function tsToDate(ts: Timestamp | null | undefined): Date {
+  if (!ts) return new Date(0);
+  return ts.toDate();
+}
+
+function tsToDateOrNull(ts: Timestamp | null | undefined): Date | null {
+  if (!ts) return null;
+  return ts.toDate();
+}
+
+// ---------------------------------------------------------------------------
+// User operations
+// ---------------------------------------------------------------------------
+
 export async function upsertUser(user: InsertUser): Promise<void> {
   if (!user.openId) {
-    throw new Error("User openId is required for upsert");
+    throw new Error('User openId is required for upsert');
   }
 
   const db = getDb();
+  const now = new Date();
 
-  try {
-    const values: InsertUser = {
+  const snapshot = await db
+    .collection('users')
+    .where('openId', '==', user.openId)
+    .limit(1)
+    .get();
+
+  const updates: Record<string, unknown> = {
+    updatedAt: now,
+    lastSignedIn: user.lastSignedIn ?? now,
+  };
+
+  if (user.name !== undefined) updates.name = user.name ?? null;
+  if (user.email !== undefined) updates.email = user.email ?? null;
+  if (user.loginMethod !== undefined) updates.loginMethod = user.loginMethod ?? null;
+  if (user.role !== undefined) {
+    updates.role = user.role;
+  } else if (user.openId === ENV.ownerOpenId) {
+    updates.role = 'admin';
+  }
+
+  if (snapshot.empty) {
+    await db.collection('users').add({
       openId: user.openId,
-    };
-    const updateSet: Record<string, unknown> = {};
-
-    const textFields = ["name", "email", "loginMethod"] as const;
-    type TextField = (typeof textFields)[number];
-
-    const assignNullable = (field: TextField) => {
-      const value = user[field];
-      if (value === undefined) return;
-      const normalized = value ?? null;
-      values[field] = normalized;
-      updateSet[field] = normalized;
-    };
-
-    textFields.forEach(assignNullable);
-
-    if (user.lastSignedIn !== undefined) {
-      values.lastSignedIn = user.lastSignedIn;
-      updateSet.lastSignedIn = user.lastSignedIn;
-    }
-    if (user.role !== undefined) {
-      values.role = user.role;
-      updateSet.role = user.role;
-    } else if (user.openId === ENV.ownerOpenId) {
-      values.role = 'admin';
-      updateSet.role = 'admin';
-    }
-
-    if (!values.lastSignedIn) {
-      values.lastSignedIn = new Date();
-    }
-
-    if (Object.keys(updateSet).length === 0) {
-      updateSet.lastSignedIn = new Date();
-    }
-
-    await db.insert(users).values(values).onConflictDoUpdate({
-      target: users.openId,
-      set: updateSet,
+      name: user.name ?? null,
+      email: user.email ?? null,
+      loginMethod: user.loginMethod ?? null,
+      role: updates.role ?? (user.openId === ENV.ownerOpenId ? 'admin' : 'user'),
+      createdAt: now,
+      updatedAt: now,
+      lastSignedIn: user.lastSignedIn ?? now,
     });
-  } catch (error) {
-    console.error("[Database] Failed to upsert user:", error);
-    throw error;
+  } else {
+    await snapshot.docs[0]!.ref.update(updates);
   }
 }
 
-export async function getUserByOpenId(openId: string) {
+export async function getUserByOpenId(openId: string): Promise<User | undefined> {
   const db = getDb();
-  const result = await db.select().from(users).where(eq(users.openId, openId)).limit(1);
-  return result.length > 0 ? result[0] : undefined;
+  const snapshot = await db
+    .collection('users')
+    .where('openId', '==', openId)
+    .limit(1)
+    .get();
+
+  if (snapshot.empty) return undefined;
+
+  const doc = snapshot.docs[0]!;
+  const data = doc.data();
+  return {
+    id: doc.id,
+    openId: data.openId,
+    name: data.name ?? null,
+    email: data.email ?? null,
+    loginMethod: data.loginMethod ?? null,
+    role: data.role ?? 'user',
+    createdAt: tsToDate(data.createdAt),
+    updatedAt: tsToDate(data.updatedAt),
+    lastSignedIn: tsToDate(data.lastSignedIn),
+  };
 }
 
-// Google Drive Token Management
+// ---------------------------------------------------------------------------
+// Google Drive Token operations
+// ---------------------------------------------------------------------------
+
 export async function saveDriveToken(token: InsertDriveToken): Promise<void> {
   const db = getDb();
-  await db.insert(driveTokens).values(token).onConflictDoUpdate({
-    target: driveTokens.userId,
-    set: {
+  const now = new Date();
+  // Use userId as doc ID so upsert is a simple set-with-merge
+  await db.collection('driveTokens').doc(token.userId).set(
+    {
+      userId: token.userId,
       accessToken: token.accessToken,
-      refreshToken: token.refreshToken,
+      refreshToken: token.refreshToken ?? null,
       expiresAt: token.expiresAt,
-      updatedAt: new Date(),
+      scope: token.scope,
+      updatedAt: now,
     },
-  });
-}
+    { merge: true }
+  );
 
-export async function getDriveToken(userId: number): Promise<DriveToken | null> {
-  const db = getDb();
-  const result = await db.select().from(driveTokens).where(eq(driveTokens.userId, userId)).limit(1);
-  return result[0] || null;
-}
-
-export async function deleteDriveToken(userId: number): Promise<void> {
-  const db = getDb();
-  await db.delete(driveTokens).where(eq(driveTokens.userId, userId));
-}
-
-// Document Management
-export async function upsertDocument(doc: InsertDocument): Promise<number> {
-  const db = getDb();
-
-  const existing = await db
-    .select()
-    .from(documents)
-    .where(eq(documents.driveFileId, doc.driveFileId))
-    .limit(1);
-
-  if (existing.length > 0) {
-    await db
-      .update(documents)
-      .set({
-        fileName: doc.fileName,
-        modifiedTime: doc.modifiedTime,
-        extractedText: doc.extractedText,
-        isIndexed: doc.isIndexed,
-        updatedAt: new Date(),
-      })
-      .where(eq(documents.driveFileId, doc.driveFileId));
-    return existing[0]!.id;
-  } else {
-    const [row] = await db.insert(documents).values(doc).returning({ id: documents.id });
-    return row!.id;
+  // Set createdAt only if creating for the first time
+  const ref = db.collection('driveTokens').doc(token.userId);
+  const snap = await ref.get();
+  if (!snap.data()?.createdAt) {
+    await ref.update({ createdAt: now });
   }
 }
 
-export async function markDocumentIndexed(id: number): Promise<void> {
+export async function getDriveToken(userId: string): Promise<DriveToken | null> {
   const db = getDb();
-  await db.update(documents).set({ isIndexed: true, updatedAt: new Date() }).where(eq(documents.id, id));
+  const doc = await db.collection('driveTokens').doc(userId).get();
+  if (!doc.exists) return null;
+
+  const data = doc.data()!;
+  return {
+    id: doc.id,
+    userId: data.userId,
+    accessToken: data.accessToken,
+    refreshToken: data.refreshToken ?? null,
+    expiresAt: tsToDate(data.expiresAt),
+    scope: data.scope ?? '',
+    createdAt: tsToDate(data.createdAt),
+    updatedAt: tsToDate(data.updatedAt),
+  };
+}
+
+export async function deleteDriveToken(userId: string): Promise<void> {
+  const db = getDb();
+  await db.collection('driveTokens').doc(userId).delete();
+}
+
+// ---------------------------------------------------------------------------
+// Document operations
+// ---------------------------------------------------------------------------
+
+export async function upsertDocument(doc: InsertDocument): Promise<string> {
+  const db = getDb();
+  const now = new Date();
+
+  const snapshot = await db
+    .collection('documents')
+    .where('driveFileId', '==', doc.driveFileId)
+    .limit(1)
+    .get();
+
+  if (!snapshot.empty) {
+    const ref = snapshot.docs[0]!.ref;
+    await ref.update({
+      fileName: doc.fileName,
+      modifiedTime: doc.modifiedTime ?? null,
+      extractedText: doc.extractedText ?? null,
+      isIndexed: doc.isIndexed ?? false,
+      updatedAt: now,
+    });
+    return snapshot.docs[0]!.id;
+  }
+
+  const ref = await db.collection('documents').add({
+    driveFileId: doc.driveFileId,
+    fileName: doc.fileName,
+    fileType: doc.fileType,
+    filePath: doc.filePath,
+    mimeType: doc.mimeType,
+    fileSize: doc.fileSize ?? null,
+    modifiedTime: doc.modifiedTime ?? null,
+    extractedText: doc.extractedText ?? null,
+    isIndexed: doc.isIndexed ?? false,
+    isPrimaryResume: doc.isPrimaryResume ?? false,
+    createdAt: now,
+    updatedAt: now,
+  });
+  return ref.id;
+}
+
+export async function markDocumentIndexed(id: string): Promise<void> {
+  const db = getDb();
+  await db.collection('documents').doc(id).update({
+    isIndexed: true,
+    updatedAt: new Date(),
+  });
 }
 
 export async function getDocuments(): Promise<Document[]> {
   const db = getDb();
-  return db.select().from(documents).orderBy(desc(documents.createdAt));
+  const snapshot = await db
+    .collection('documents')
+    .orderBy('createdAt', 'desc')
+    .get();
+
+  return snapshot.docs.map(doc => {
+    const data = doc.data();
+    return {
+      id: doc.id,
+      driveFileId: data.driveFileId,
+      fileName: data.fileName,
+      fileType: data.fileType,
+      filePath: data.filePath,
+      mimeType: data.mimeType,
+      fileSize: data.fileSize ?? null,
+      modifiedTime: tsToDateOrNull(data.modifiedTime),
+      extractedText: data.extractedText ?? null,
+      isIndexed: data.isIndexed ?? false,
+      isPrimaryResume: data.isPrimaryResume ?? false,
+      createdAt: tsToDate(data.createdAt),
+      updatedAt: tsToDate(data.updatedAt),
+    };
+  });
 }
 
-export async function getDocumentById(id: number): Promise<Document | undefined> {
+export async function getDocumentById(id: string): Promise<Document | undefined> {
   const db = getDb();
-  const result = await db.select().from(documents).where(eq(documents.id, id)).limit(1);
-  return result[0];
-}
+  const doc = await db.collection('documents').doc(id).get();
+  if (!doc.exists) return undefined;
 
-// Document Chunk Management
-export async function saveDocumentChunk(chunk: InsertDocumentChunk): Promise<void> {
-  const db = getDb();
-  await db.insert(documentChunks).values(chunk);
+  const data = doc.data()!;
+  return {
+    id: doc.id,
+    driveFileId: data.driveFileId,
+    fileName: data.fileName,
+    fileType: data.fileType,
+    filePath: data.filePath,
+    mimeType: data.mimeType,
+    fileSize: data.fileSize ?? null,
+    modifiedTime: tsToDateOrNull(data.modifiedTime),
+    extractedText: data.extractedText ?? null,
+    isIndexed: data.isIndexed ?? false,
+    isPrimaryResume: data.isPrimaryResume ?? false,
+    createdAt: tsToDate(data.createdAt),
+    updatedAt: tsToDate(data.updatedAt),
+  };
 }
 
 export async function getDocumentByDriveFileId(driveFileId: string): Promise<Document | undefined> {
   const db = getDb();
-  const result = await db.select().from(documents).where(eq(documents.driveFileId, driveFileId)).limit(1);
-  return result[0];
+  const snapshot = await db
+    .collection('documents')
+    .where('driveFileId', '==', driveFileId)
+    .limit(1)
+    .get();
+
+  if (snapshot.empty) return undefined;
+
+  const doc = snapshot.docs[0]!;
+  const data = doc.data();
+  return {
+    id: doc.id,
+    driveFileId: data.driveFileId,
+    fileName: data.fileName,
+    fileType: data.fileType,
+    filePath: data.filePath,
+    mimeType: data.mimeType,
+    fileSize: data.fileSize ?? null,
+    modifiedTime: tsToDateOrNull(data.modifiedTime),
+    extractedText: data.extractedText ?? null,
+    isIndexed: data.isIndexed ?? false,
+    isPrimaryResume: data.isPrimaryResume ?? false,
+    createdAt: tsToDate(data.createdAt),
+    updatedAt: tsToDate(data.updatedAt),
+  };
 }
 
-export async function deleteDocumentChunks(documentId: number): Promise<void> {
-  const db = getDb();
-  await db.delete(documentChunks).where(eq(documentChunks.documentId, documentId));
-}
-
-export async function deleteDocument(id: number): Promise<void> {
-  const db = getDb();
+export async function deleteDocument(id: string): Promise<void> {
   await deleteDocumentChunks(id);
-  await db.delete(documents).where(eq(documents.id, id));
+  const db = getDb();
+  await db.collection('documents').doc(id).delete();
 }
 
-export async function setPrimaryResume(id: number): Promise<void> {
+export async function setPrimaryResume(id: string): Promise<void> {
   const db = getDb();
-  await db.update(documents).set({ isPrimaryResume: false });
-  await db.update(documents).set({ isPrimaryResume: true }).where(eq(documents.id, id));
+  const snapshot = await db.collection('documents').get();
+  const batch = db.batch();
+
+  for (const doc of snapshot.docs) {
+    batch.update(doc.ref, { isPrimaryResume: false });
+  }
+  batch.update(db.collection('documents').doc(id), { isPrimaryResume: true });
+
+  await batch.commit();
 }
 
 export async function getPrimaryResume(): Promise<Document | undefined> {
   const db = getDb();
-  const result = await db.select().from(documents).where(eq(documents.isPrimaryResume, true)).limit(1);
-  return result[0];
+  const snapshot = await db
+    .collection('documents')
+    .where('isPrimaryResume', '==', true)
+    .limit(1)
+    .get();
+
+  if (snapshot.empty) return undefined;
+
+  const doc = snapshot.docs[0]!;
+  const data = doc.data();
+  return {
+    id: doc.id,
+    driveFileId: data.driveFileId,
+    fileName: data.fileName,
+    fileType: data.fileType,
+    filePath: data.filePath,
+    mimeType: data.mimeType,
+    fileSize: data.fileSize ?? null,
+    modifiedTime: tsToDateOrNull(data.modifiedTime),
+    extractedText: data.extractedText ?? null,
+    isIndexed: data.isIndexed ?? false,
+    isPrimaryResume: data.isPrimaryResume ?? false,
+    createdAt: tsToDate(data.createdAt),
+    updatedAt: tsToDate(data.updatedAt),
+  };
 }
 
-export async function getDocumentChunks(documentId: number): Promise<DocumentChunk[]> {
+// ---------------------------------------------------------------------------
+// Document Chunk operations
+// ---------------------------------------------------------------------------
+
+export async function saveDocumentChunk(chunk: InsertDocumentChunk): Promise<void> {
   const db = getDb();
-  return db
-    .select()
-    .from(documentChunks)
-    .where(eq(documentChunks.documentId, documentId));
+  await db.collection('documentChunks').add({
+    documentId: chunk.documentId,
+    chunkIndex: chunk.chunkIndex,
+    content: chunk.content,
+    embedding: chunk.embedding ?? null,
+    documentFileName: chunk.documentFileName ?? '',
+    documentDriveFileId: chunk.documentDriveFileId ?? '',
+    documentFileType: chunk.documentFileType ?? '',
+    createdAt: new Date(),
+  });
 }
 
-export async function getChunksBatch(offset: number, limit: number): Promise<DocumentChunk[]> {
+export async function getDocumentChunks(documentId: string): Promise<DocumentChunk[]> {
   const db = getDb();
-  return db.select().from(documentChunks).limit(limit).offset(offset);
+  const snapshot = await db
+    .collection('documentChunks')
+    .where('documentId', '==', documentId)
+    .get();
+
+  return snapshot.docs.map(doc => {
+    const data = doc.data();
+    return {
+      id: doc.id,
+      documentId: data.documentId,
+      chunkIndex: data.chunkIndex,
+      content: data.content,
+      embedding: data.embedding ?? null,
+      documentFileName: data.documentFileName ?? '',
+      documentDriveFileId: data.documentDriveFileId ?? '',
+      documentFileType: data.documentFileType ?? '',
+      createdAt: tsToDate(data.createdAt),
+    };
+  });
 }
 
-export async function getChunksBatchWithDocuments(offset: number, limit: number) {
+export async function deleteDocumentChunks(documentId: string): Promise<void> {
   const db = getDb();
-  return db
-    .select({
-      id: documentChunks.id,
-      documentId: documentChunks.documentId,
-      content: documentChunks.content,
-      embedding: documentChunks.embedding,
-      fileName: documents.fileName,
-      driveFileId: documents.driveFileId,
-      fileType: documents.fileType,
-    })
-    .from(documentChunks)
-    .innerJoin(documents, eq(documentChunks.documentId, documents.id))
+  const snapshot = await db
+    .collection('documentChunks')
+    .where('documentId', '==', documentId)
+    .get();
+
+  if (snapshot.empty) return;
+
+  // Delete in batches of 500 (Firestore batch limit)
+  const BATCH_SIZE = 500;
+  for (let i = 0; i < snapshot.docs.length; i += BATCH_SIZE) {
+    const batch = db.batch();
+    snapshot.docs.slice(i, i + BATCH_SIZE).forEach(doc => batch.delete(doc.ref));
+    await batch.commit();
+  }
+}
+
+export async function getChunksBatchWithDocuments(
+  offset: number,
+  limit: number
+): Promise<Array<{
+  id: string;
+  documentId: string;
+  content: string;
+  embedding: number[] | null;
+  fileName: string;
+  driveFileId: string;
+  fileType: string;
+}>> {
+  const db = getDb();
+  const snapshot = await db
+    .collection('documentChunks')
+    .orderBy('createdAt')
+    .offset(offset)
     .limit(limit)
-    .offset(offset);
+    .get();
+
+  return snapshot.docs.map(doc => {
+    const data = doc.data();
+    return {
+      id: doc.id,
+      documentId: data.documentId,
+      content: data.content,
+      embedding: data.embedding ?? null,
+      fileName: data.documentFileName ?? '',
+      driveFileId: data.documentDriveFileId ?? '',
+      fileType: data.documentFileType ?? '',
+    };
+  });
 }
 
-// Analysis Management
-export async function saveAnalysis(analysis: InsertAnalysis): Promise<number> {
+// ---------------------------------------------------------------------------
+// Analysis operations
+// ---------------------------------------------------------------------------
+
+export async function saveAnalysis(analysis: InsertAnalysis): Promise<string> {
   const db = getDb();
-  const [row] = await db.insert(analyses).values(analysis).returning({ id: analyses.id });
-  return row!.id;
+  const now = new Date();
+  const ref = await db.collection('analyses').add({
+    userId: analysis.userId ?? null,
+    jobTitle: analysis.jobTitle ?? null,
+    jobDescription: analysis.jobDescription,
+    matchScore: analysis.matchScore ?? null,
+    mismatchScore: analysis.mismatchScore ?? null,
+    hardSkillsScore: analysis.hardSkillsScore ?? null,
+    experienceScore: analysis.experienceScore ?? null,
+    domainScore: analysis.domainScore ?? null,
+    softSkillsScore: analysis.softSkillsScore ?? null,
+    topStrengths: analysis.topStrengths ?? null,
+    topGaps: analysis.topGaps ?? null,
+    detailedReport: analysis.detailedReport ?? null,
+    tokensInput: analysis.tokensInput ?? null,
+    tokensOutput: analysis.tokensOutput ?? null,
+    createdAt: now,
+    updatedAt: now,
+  });
+  return ref.id;
 }
 
-export async function getAnalysesByUser(userId: number): Promise<Analysis[]> {
+export async function getAnalysisById(id: string): Promise<Analysis | undefined> {
   const db = getDb();
-  return db
-    .select()
-    .from(analyses)
-    .where(eq(analyses.userId, userId))
-    .orderBy(desc(analyses.createdAt));
+  const doc = await db.collection('analyses').doc(id).get();
+  if (!doc.exists) return undefined;
+
+  const data = doc.data()!;
+  return {
+    id: doc.id,
+    userId: data.userId ?? null,
+    jobTitle: data.jobTitle ?? null,
+    jobDescription: data.jobDescription,
+    matchScore: data.matchScore ?? null,
+    mismatchScore: data.mismatchScore ?? null,
+    hardSkillsScore: data.hardSkillsScore ?? null,
+    experienceScore: data.experienceScore ?? null,
+    domainScore: data.domainScore ?? null,
+    softSkillsScore: data.softSkillsScore ?? null,
+    topStrengths: data.topStrengths ?? null,
+    topGaps: data.topGaps ?? null,
+    detailedReport: data.detailedReport ?? null,
+    tokensInput: data.tokensInput ?? null,
+    tokensOutput: data.tokensOutput ?? null,
+    createdAt: tsToDate(data.createdAt),
+    updatedAt: tsToDate(data.updatedAt),
+  };
 }
 
 export async function getAllAnalyses(): Promise<Analysis[]> {
   const db = getDb();
-  return db.select().from(analyses).orderBy(desc(analyses.createdAt));
+  const snapshot = await db
+    .collection('analyses')
+    .orderBy('createdAt', 'desc')
+    .get();
+
+  return snapshot.docs.map(doc => {
+    const data = doc.data();
+    return {
+      id: doc.id,
+      userId: data.userId ?? null,
+      jobTitle: data.jobTitle ?? null,
+      jobDescription: data.jobDescription,
+      matchScore: data.matchScore ?? null,
+      mismatchScore: data.mismatchScore ?? null,
+      hardSkillsScore: data.hardSkillsScore ?? null,
+      experienceScore: data.experienceScore ?? null,
+      domainScore: data.domainScore ?? null,
+      softSkillsScore: data.softSkillsScore ?? null,
+      topStrengths: data.topStrengths ?? null,
+      topGaps: data.topGaps ?? null,
+      detailedReport: data.detailedReport ?? null,
+      tokensInput: data.tokensInput ?? null,
+      tokensOutput: data.tokensOutput ?? null,
+      createdAt: tsToDate(data.createdAt),
+      updatedAt: tsToDate(data.updatedAt),
+    };
+  });
 }
 
-export async function getAnalysisById(id: number): Promise<Analysis | undefined> {
+export async function getAnalysesByUser(userId: string): Promise<Analysis[]> {
   const db = getDb();
-  const result = await db.select().from(analyses).where(eq(analyses.id, id)).limit(1);
-  return result[0];
+  const snapshot = await db
+    .collection('analyses')
+    .where('userId', '==', userId)
+    .orderBy('createdAt', 'desc')
+    .get();
+
+  return snapshot.docs.map(doc => {
+    const data = doc.data();
+    return {
+      id: doc.id,
+      userId: data.userId ?? null,
+      jobTitle: data.jobTitle ?? null,
+      jobDescription: data.jobDescription,
+      matchScore: data.matchScore ?? null,
+      mismatchScore: data.mismatchScore ?? null,
+      hardSkillsScore: data.hardSkillsScore ?? null,
+      experienceScore: data.experienceScore ?? null,
+      domainScore: data.domainScore ?? null,
+      softSkillsScore: data.softSkillsScore ?? null,
+      topStrengths: data.topStrengths ?? null,
+      topGaps: data.topGaps ?? null,
+      detailedReport: data.detailedReport ?? null,
+      tokensInput: data.tokensInput ?? null,
+      tokensOutput: data.tokensOutput ?? null,
+      createdAt: tsToDate(data.createdAt),
+      updatedAt: tsToDate(data.updatedAt),
+    };
+  });
 }
 
-// Chat Message Management
+// ---------------------------------------------------------------------------
+// Chat Message operations
+// ---------------------------------------------------------------------------
+
 export async function saveChatMessage(message: InsertChatMessage): Promise<void> {
   const db = getDb();
-  await db.insert(chatMessages).values(message);
+  await db.collection('chatMessages').add({
+    analysisId: message.analysisId,
+    role: message.role,
+    content: message.content,
+    tokensInput: message.tokensInput ?? null,
+    tokensOutput: message.tokensOutput ?? null,
+    createdAt: new Date(),
+  });
 }
 
-export async function getChatMessages(analysisId: number): Promise<ChatMessage[]> {
+export async function getChatMessages(analysisId: string): Promise<ChatMessage[]> {
   const db = getDb();
-  return db
-    .select()
-    .from(chatMessages)
-    .where(eq(chatMessages.analysisId, analysisId));
+  const snapshot = await db
+    .collection('chatMessages')
+    .where('analysisId', '==', analysisId)
+    .orderBy('createdAt')
+    .get();
+
+  return snapshot.docs.map(doc => {
+    const data = doc.data();
+    return {
+      id: doc.id,
+      analysisId: data.analysisId,
+      role: data.role,
+      content: data.content,
+      tokensInput: data.tokensInput ?? null,
+      tokensOutput: data.tokensOutput ?? null,
+      createdAt: tsToDate(data.createdAt),
+    };
+  });
 }
 
-// Aggregate stats for public reporting dashboard
+// ---------------------------------------------------------------------------
+// Aggregate stats (in-memory aggregation — personal-scale tool)
+// ---------------------------------------------------------------------------
+
 export async function getSystemStats() {
   const db = getDb();
 
-  const docsByType = await db
-    .select({
-      fileType: documents.fileType,
-      count: sql<number>`cast(count(*) as int)`,
-      totalChunks: sql<number>`cast(0 as int)`,
-    })
-    .from(documents)
-    .groupBy(documents.fileType);
+  const [docsSnap, chunksSnap, analysesSnap, chatSnap] = await Promise.all([
+    db.collection('documents').get(),
+    db.collection('documentChunks').get(),
+    db.collection('analyses').get(),
+    db.collection('chatMessages').where('role', '==', 'assistant').get(),
+  ]);
 
-  const chunksByType = await db
-    .select({
-      fileType: documents.fileType,
-      chunks: sql<number>`cast(count(${documentChunks.id}) as int)`,
-    })
-    .from(documentChunks)
-    .innerJoin(documents, eq(documentChunks.documentId, documents.id))
-    .groupBy(documents.fileType);
+  // Count documents by fileType
+  const docCountByType = new Map<string, number>();
+  for (const doc of docsSnap.docs) {
+    const ft = doc.data().fileType ?? 'unknown';
+    docCountByType.set(ft, (docCountByType.get(ft) ?? 0) + 1);
+  }
 
-  const totalChunksResult = await db
-    .select({ total: sql<number>`cast(count(*) as int)` })
-    .from(documentChunks);
+  // Count chunks by documentFileType
+  const chunkCountByType = new Map<string, number>();
+  for (const doc of chunksSnap.docs) {
+    const ft = doc.data().documentFileType ?? 'unknown';
+    chunkCountByType.set(ft, (chunkCountByType.get(ft) ?? 0) + 1);
+  }
 
-  const analysisTokens = await db
-    .select({
-      totalAnalyses: sql<number>`cast(count(*) as int)`,
-      tokensInput: sql<number>`cast(coalesce(sum(${analyses.tokensInput}), 0) as int)`,
-      tokensOutput: sql<number>`cast(coalesce(sum(${analyses.tokensOutput}), 0) as int)`,
-    })
-    .from(analyses);
+  const docsByType = Array.from(docCountByType.entries()).map(([fileType, count]) => ({
+    fileType,
+    count,
+    totalChunks: 0,
+  }));
 
-  const chatTokens = await db
-    .select({
-      tokensInput: sql<number>`cast(coalesce(sum(${chatMessages.tokensInput}), 0) as int)`,
-      tokensOutput: sql<number>`cast(coalesce(sum(${chatMessages.tokensOutput}), 0) as int)`,
-    })
-    .from(chatMessages)
-    .where(eq(chatMessages.role, "assistant"));
+  const chunksByType = Array.from(chunkCountByType.entries()).map(([fileType, chunks]) => ({
+    fileType,
+    chunks,
+  }));
+
+  let analysisTokensInput = 0;
+  let analysisTokensOutput = 0;
+  for (const doc of analysesSnap.docs) {
+    const data = doc.data();
+    analysisTokensInput += data.tokensInput ?? 0;
+    analysisTokensOutput += data.tokensOutput ?? 0;
+  }
+
+  let chatTokensInput = 0;
+  let chatTokensOutput = 0;
+  for (const doc of chatSnap.docs) {
+    const data = doc.data();
+    chatTokensInput += data.tokensInput ?? 0;
+    chatTokensOutput += data.tokensOutput ?? 0;
+  }
 
   return {
     docsByType,
     chunksByType,
-    totalChunks: totalChunksResult[0]?.total ?? 0,
-    totalAnalyses: analysisTokens[0]?.totalAnalyses ?? 0,
-    analysisTokensInput: analysisTokens[0]?.tokensInput ?? 0,
-    analysisTokensOutput: analysisTokens[0]?.tokensOutput ?? 0,
-    chatTokensInput: chatTokens[0]?.tokensInput ?? 0,
-    chatTokensOutput: chatTokens[0]?.tokensOutput ?? 0,
+    totalChunks: chunksSnap.size,
+    totalAnalyses: analysesSnap.size,
+    analysisTokensInput,
+    analysisTokensOutput,
+    chatTokensInput,
+    chatTokensOutput,
   };
 }

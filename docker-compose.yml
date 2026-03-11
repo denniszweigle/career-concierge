@@ -6,9 +6,6 @@ services:
     environment:
       NODE_ENV: production
       PORT: 3000
-    volumes:
-      # SQLite database persists across rebuilds
-      - sqlite_data:/app/data
     networks:
       - web
 
@@ -29,7 +26,6 @@ services:
       - app
 
 volumes:
-  sqlite_data:
   caddy_data:
   caddy_config:
 
