@@ -1,0 +1,50 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: career-concierge
+  namespace: career-concierge
+spec:
+  replicas: 1
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: career-concierge
+  template:
+    metadata:
+      labels:
+        app: career-concierge
+    spec:
+      containers:
+        - name: app
+          image: ghcr.io/denniszweigle/career-concierge:latest
+          ports:
+            - containerPort: 3000
+          envFrom:
+            - secretRef:
+                name: career-concierge-env
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "250m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 3000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 3000
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            failureThreshold: 3
+          # No volumeMounts needed — Firestore is an external managed database

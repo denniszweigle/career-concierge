@@ -44,6 +44,11 @@ async function startServer() {
   registerOAuthRoutes(app);
   // Google Drive OAuth callback
   registerGoogleDriveCallback(app);
+  // Health check — used by k8s liveness + readiness probes
+  app.get("/health", (_req, res) => {
+    res.status(200).json({ status: "ok" });
+  });
+
   // Streaming match analysis — SSE endpoint, emits progress then saves & redirects
   app.post("/api/stream-match", async (req, res) => {
     const { jobTitle, jobDescription } = req.body as {
@@ -104,7 +109,7 @@ async function startServer() {
     const { question, history, analysisId } = req.body as {
       question: string;
       history: Array<{ role: "user" | "assistant"; content: string }>;
-      analysisId?: number;
+      analysisId?: string;
     };
 
     if (!question || typeof question !== "string") {
