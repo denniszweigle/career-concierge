@@ -18,6 +18,8 @@ spec:
       labels:
         app: career-concierge
     spec:
+      imagePullSecrets:
+        - name: ghcr-secret
       containers:
         - name: app
           image: ghcr.io/denniszweigle/career-concierge:latest

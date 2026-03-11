@@ -90,6 +90,15 @@ jobs:
           gcloud container clusters get-credentials career-concierge \
             --region=us-central1 --project=career-concierge-prod
 
+      - name: Refresh GHCR image pull secret
+        run: |
+          kubectl create secret docker-registry ghcr-secret \
+            --namespace=career-concierge \
+            --docker-server=ghcr.io \
+            --docker-username=${{ github.actor }} \
+            --docker-password=${{ secrets.GITHUB_TOKEN }} \
+            --dry-run=client -o yaml | kubectl apply -f -
+
       - name: Apply k8s manifests
         run: kubectl apply -f k8s/ --namespace=career-concierge
 
