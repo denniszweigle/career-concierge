@@ -170,7 +170,9 @@ See [`docs/google_drive_setup.md`](docs/google_drive_setup.md) for the full walk
 
 1. Create a Google Cloud project and enable the **Google Drive API**.
 2. Create an OAuth 2.0 Web Application credential.
-3. Add `http://localhost:3000/api/google-drive/callback` as an authorized redirect URI.
+3. Add both redirect URIs:
+   - `http://localhost:3000/api/google-drive/callback`  (local dev)
+   - `https://baeb90.com/api/google-drive/callback`     (production)
 4. Copy the Client ID and Secret into `.env`.
 5. In the app, go to Admin → Connect Google Drive → complete the OAuth flow.
 6. Click **Sync Documents** to index your folder.
@@ -465,16 +467,20 @@ server/documentExtractor.test.ts        # 8 tests covering all 5 file types
 
 ## Production Deployment
 
-Deployed on a Hetzner VPS using Docker Compose with Caddy as a reverse proxy for automatic HTTPS.
-
-See [`docs/hetzner_deployment.md`](docs/hetzner_deployment.md) for the full step-by-step guide.
+Deployed on Google Kubernetes Engine (GKE) at https://baeb90.com.
+Cloudflare provides HTTPS/SSL termination; traffic proxies to a GKE LoadBalancer (34.57.253.211) on port 80.
 
 CI/CD is handled by GitHub Actions (`.github/workflows/deploy.yml`) in three stages:
 1. **Type-check & unit tests** — runs `pnpm check` + `pnpm test` on every push to `main`
-2. **Build & push Docker image** — builds the production image in GitHub Actions (with GHA layer caching) and pushes to GitHub Container Registry (`ghcr.io`)
-3. **Deploy** — SSHs into the Hetzner server, pulls the pre-built image from ghcr.io, and runs `docker compose up -d` — no server-side build, deploy completes in under 2 minutes
+2. **Build & push Docker image** — builds the production image and pushes to `ghcr.io/denniszweigle/career-concierge`
+3. **Deploy to GKE** — applies `k8s/` manifests, updates deployment image, waits for rollout
+   - Cluster: `career-concierge`, region: `us-central1`, project: `career-concierge-prod`
 
-The SQLite database and Caddy TLS certificates persist across deploys via Docker named volumes (`sqlite_data`, `caddy_data`).
+GCP service account key stored as `GCP_SA_KEY` GitHub secret.
+K8s namespace: `career-concierge`. Env vars injected via `career-concierge-env` Secret.
+See [`k8s/`](k8s/) directory for all manifests.
+
+> **NOTE:** SQLite is ephemeral in GKE — pod restarts lose DB data. A PersistentVolumeClaim for `/app/data` is a planned follow-up.
 
 ---
 

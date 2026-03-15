@@ -2,7 +2,7 @@
 
 ## The Problem
 
-You're seeing **"Error 400: redirect_uri_mismatch"** because Google OAuth requires you to register **exact** redirect URIs in advance. The application uses different URLs for development preview vs. production deployment.
+You're seeing **"Error 400: redirect_uri_mismatch"** because Google OAuth requires you to register **exact** redirect URIs in advance. The application uses different URLs for development vs. production deployment.
 
 ## The Solution
 
@@ -10,12 +10,12 @@ Add **BOTH** redirect URIs to your Google Cloud Console OAuth client:
 
 ### 1. Production URL (Published Site)
 ```
-https://careerconcierge-cedwcmhu.manus.space/api/google-drive/callback
+https://baeb90.com/api/google-drive/callback
 ```
 
-### 2. Development Preview URL (Testing)
+### 2. Local Development URL
 ```
-https://3000-iefof8di98c2t5xdu5uc2-a07ff6f8.us2.manus.computer/api/google-drive/callback
+http://localhost:3000/api/google-drive/callback
 ```
 
 ## Step-by-Step Instructions
@@ -37,14 +37,14 @@ In the **"Authorized redirect URIs"** section:
 
 1. You should already have:
    ```
-   https://careerconcierge-cedwcmhu.manus.space/api/google-drive/callback
+   https://baeb90.com/api/google-drive/callback
    ```
 
 2. Click **"+ ADD URI"**
 
-3. Add the development preview URL:
+3. Add the local development URL:
    ```
-   https://3000-iefof8di98c2t5xdu5uc2-a07ff6f8.us2.manus.computer/api/google-drive/callback
+   http://localhost:3000/api/google-drive/callback
    ```
 
 4. Click **"SAVE"**
@@ -56,26 +56,25 @@ In the **"Authorized redirect URIs"** section:
 
 ### Step 5: Test the Connection
 
-**Option A - Test in Development Preview (Immediate)**
-1. Go to: https://3000-iefof8di98c2t5xdu5uc2-a07ff6f8.us2.manus.computer/dashboard
-2. Click "Connect Google Drive"
-3. Sign in with `dennis.zweigle@gmail.com`
-4. Grant permissions
-5. Should redirect back with "Connected" status
+**Option A - Test Locally (Development)**
+1. Start the dev server: `pnpm dev`
+2. Go to: `http://localhost:3000`
+3. Click "Connect Google Drive"
+4. Sign in with `dennis.zweigle@gmail.com`
+5. Grant permissions
+6. Should redirect back with "Connected" status
 
-**Option B - Test in Production (After Publishing)**
-1. Publish the latest checkpoint in Manus UI
-2. Wait for deployment to complete
-3. Go to: https://careerconcierge-cedwcmhu.manus.space/dashboard
-4. Click "Connect Google Drive"
-5. Complete OAuth flow
+**Option B - Test in Production**
+1. Go to: https://baeb90.com
+2. Click "Connect Google Drive"
+3. Complete OAuth flow
 
 ## Why This Happens
 
 The application dynamically constructs the redirect URI based on where it's running:
 
-- **Development**: Uses the preview URL (`3000-iefof8di98c2t5xdu5uc2...`)
-- **Production**: Uses the published domain (`careerconcierge-cedwcmhu.manus.space`)
+- **Development**: Uses `http://localhost:3000`
+- **Production**: Uses `https://baeb90.com`
 
 Google's OAuth security requires you to pre-register **every possible** redirect URI. This prevents malicious sites from intercepting your OAuth tokens.
 
@@ -85,31 +84,30 @@ After adding both URIs, you should see them listed in Google Cloud Console like 
 
 ```
 Authorized redirect URIs:
-✓ https://careerconcierge-cedwcmhu.manus.space/api/google-drive/callback
-✓ https://3000-iefof8di98c2t5xdu5uc2-a07ff6f8.us2.manus.computer/api/google-drive/callback
+✓ https://baeb90.com/api/google-drive/callback
+✓ http://localhost:3000/api/google-drive/callback
 ```
 
 ## Troubleshooting
 
 ### Still seeing redirect_uri_mismatch?
 
-1. **Check for typos**: The URI must be **exact** - no trailing slashes, correct protocol (https), exact subdomain
+1. **Check for typos**: The URI must be **exact** - no trailing slashes, correct protocol (https/http), exact domain
 2. **Wait longer**: Changes can take up to an hour to propagate
 3. **Clear browser cache**: Sometimes the error is cached
 4. **Verify the Client ID**: Make sure you're editing the correct OAuth client
 
 ### Different error after fixing redirect URI?
 
-If you now see **"Access blocked: manus.space has not completed the Google verification process"**:
+If you now see **"Access blocked: baeb90.com has not completed the Google verification process"**:
 - This means the redirect URI is correct!
 - You just need to add yourself as a test user (already done in "Audience" section)
 
 ## Summary
 
 **What you need to do:**
-1. Add the development preview URL to Google Cloud Console redirect URIs
+1. Add both redirect URIs to Google Cloud Console
 2. Wait 5-10 minutes
-3. Test the connection in the preview dashboard
-4. Once working, publish and test in production
+3. Test the connection in your preferred environment
 
-Both URLs will work simultaneously, allowing you to test in development and use in production without changing OAuth settings.
+Both URLs will work simultaneously, allowing you to test locally and use in production without changing OAuth settings.

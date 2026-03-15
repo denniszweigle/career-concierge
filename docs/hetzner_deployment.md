@@ -1,5 +1,9 @@
 # Hetzner Production Deployment Guide
 
+> **NOTE:** As of March 2026, production is deployed on GKE at https://baeb90.com.
+> This document is retained as a legacy reference for Docker Compose / Hetzner VPS deployments.
+> For the current deployment, see `k8s/` manifests and `.github/workflows/deploy.yml`.
+
 Deploys the Career Concierge app to a Hetzner VPS using Docker Compose with Caddy as a reverse proxy for automatic HTTPS. DNS is managed at GoDaddy (A record only — no nameserver transfer required).
 
 ---

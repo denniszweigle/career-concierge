@@ -14,9 +14,11 @@ pnpm test         # Run all Vitest tests (server only, Node environment)
 pnpm test server/openai.integration.test.ts   # Run a single test file
 pnpm db:push      # Apply Drizzle schema to SQLite (run after schema changes)
 
-# CI/CD: push to main triggers GitHub Actions → type-check → unit tests → SSH redeploy
-# Requires GitHub secrets: HETZNER_HOST, HETZNER_SSH_KEY
-# Manual deploy: see docs/hetzner_deployment.md
+# CI/CD: push to main triggers GitHub Actions → type-check → unit tests → build Docker image → deploy to GKE
+# Requires GitHub secrets: GCP_SA_KEY
+# GKE cluster: career-concierge (us-central1), project: career-concierge-prod, namespace: career-concierge
+# Production URL: https://baeb90.com
+# Manual k8s bootstrap: see k8s/secret-bootstrap.sh
 ```
 
 Tests live in `server/**/*.test.ts` and `server/**/*.spec.ts`. There is no frontend test setup.

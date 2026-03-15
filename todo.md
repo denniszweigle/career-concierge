@@ -44,8 +44,8 @@
 
 ## Testing & Deployment
 - [x] Save checkpoint with current implementation
-- [ ] Test OAuth flow with updated Google Cloud Console settings
-- [ ] Enable Google Drive API in Google Cloud Console
+- [x] Test OAuth flow with updated Google Cloud Console settings
+- [x] Enable Google Drive API in Google Cloud Console
 - [ ] Test document sync from Google Drive folder
 - [ ] Verify job description analysis works end-to-end
 - [ ] Publish to production after successful testing
@@ -67,4 +67,13 @@
 - [x] Add disconnect button to dashboard to clear Google Drive tokens
 - [x] Add disconnect mutation in routers.ts to delete tokens from database
 - [x] Update Dashboard UI to show disconnect button when connected
-- [ ] Test disconnect and reconnect flow to get fresh tokens in production
+- [ ] Test disconnect and reconnect flow to get fresh tokens in production (login issue outstanding)
+
+## GKE Deployment (March 2026)
+- [x] Containerize app with Dockerfile + multi-stage build
+- [x] Create GKE cluster (career-concierge, us-central1, career-concierge-prod)
+- [x] CI/CD pipeline: GitHub Actions → ghcr.io → GKE
+- [x] DNS: baeb90.com via Cloudflare (A record → 34.57.253.211, SSL Flexible)
+- [x] Google OAuth redirect URI: https://baeb90.com/api/google-drive/callback
+- [ ] Fix admin login in production (dev-login disabled; need secret-protected prod login)
+- [ ] Add PersistentVolumeClaim for SQLite data persistence across pod restarts

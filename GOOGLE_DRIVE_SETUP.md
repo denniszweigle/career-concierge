@@ -49,15 +49,10 @@ A **403 Forbidden** error when accessing Google Drive typically occurs due to on
 2. Click "Create Credentials" → "OAuth 2.0 Client ID"
 3. Select "Web application" as the application type
 4. Enter a name: "Career Concierge Web Client"
-5. **CRITICAL**: Add Authorized Redirect URI:
+5. **CRITICAL**: Add both Authorized Redirect URIs:
    ```
-   https://YOUR-DOMAIN.manus.space/api/google-drive/callback
-   ```
-   Replace `YOUR-DOMAIN` with your actual Manus project subdomain.
-   
-   **Example**: If your app is at `https://career-concierge-abc123.manus.space`, use:
-   ```
-   https://career-concierge-abc123.manus.space/api/google-drive/callback
+   https://baeb90.com/api/google-drive/callback
+   http://localhost:3000/api/google-drive/callback
    ```
 
 6. Click "Create"
@@ -65,12 +60,12 @@ A **403 Forbidden** error when accessing Google Drive typically occurs due to on
 
 ### 5. Configure Application Secrets
 
-The application already has the Google Drive credentials configured through the Manus secrets system. If you need to update them:
+Update the Kubernetes secret or your `.env` file with the credentials:
 
-1. Go to your application's Settings → Secrets panel in the Manus UI
-2. Update these values:
-   - `GOOGLE_DRIVE_CLIENT_ID`: Your OAuth 2.0 Client ID
-   - `GOOGLE_DRIVE_CLIENT_SECRET`: Your OAuth 2.0 Client Secret
+- `GOOGLE_DRIVE_CLIENT_ID`: Your OAuth 2.0 Client ID
+- `GOOGLE_DRIVE_CLIENT_SECRET`: Your OAuth 2.0 Client Secret
+
+For production (GKE), these are stored in the `career-concierge-env` Kubernetes Secret. See `k8s/secret-bootstrap.sh`.
 
 ### 6. Verify Folder Permissions
 
@@ -112,7 +107,11 @@ If you see a 403 error at this point, check:
 1. Check your application's URL (look in the browser address bar)
 2. Ensure the redirect URI in Google Cloud Console is:
    ```
-   https://YOUR-ACTUAL-DOMAIN.manus.space/api/google-drive/callback
+   https://baeb90.com/api/google-drive/callback
+   ```
+   or for local dev:
+   ```
+   http://localhost:3000/api/google-drive/callback
    ```
 3. No trailing slashes, exact protocol (https), exact path
 
@@ -138,9 +137,9 @@ If you see a 403 error at this point, check:
 **Cause**: Client ID or Client Secret is incorrect
 
 **Solution**:
-1. Verify the credentials in your Manus secrets match those in Google Cloud Console
+1. Verify the credentials in the Kubernetes secret (or `.env`) match those in Google Cloud Console
 2. Regenerate credentials if needed
-3. Restart the application after updating secrets
+3. Restart the pod after updating secrets
 
 ## Security Best Practices
 
@@ -165,8 +164,8 @@ If you're still experiencing 403 errors, verify:
 - [ ] Google Drive API is enabled in Google Cloud Console
 - [ ] OAuth consent screen is configured with correct scopes
 - [ ] OAuth 2.0 credentials are created for "Web application"
-- [ ] Redirect URI **exactly** matches: `https://YOUR-DOMAIN.manus.space/api/google-drive/callback`
-- [ ] Client ID and Secret are correctly set in application secrets
+- [ ] Redirect URI **exactly** matches: `https://baeb90.com/api/google-drive/callback` (prod) or `http://localhost:3000/api/google-drive/callback` (dev)
+- [ ] Client ID and Secret are correctly set in Kubernetes secret or `.env`
 - [ ] The target folder is accessible by the authenticated user
 - [ ] You've completed the OAuth flow and granted permissions
 
